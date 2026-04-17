@@ -1,0 +1,12 @@
+{
+  "name": "ARKHÉ - AI Architectural Systems",
+  "description": "ARKHÉ es un motor lógico de arquitectura que transforma ideas y documentos en expedientes técnicos funcionales con arquitectura de sistemas e IA.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "AI Analysis",
+    "Architectural Planning",
+    "Multimodal Ingestion"
+  ]
+}
