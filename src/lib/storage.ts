@@ -72,6 +72,14 @@ export const storageService = {
   },
 
   /**
+   * Imports a backup, merging with existing projects or overwriting if IDs match.
+   */
+  async importBackup(projects: Project[]): Promise<void> {
+    const promises = projects.map(p => localforage.setItem(p.id, p));
+    await Promise.all(promises);
+  },
+
+  /**
    * Wipes all local data.
    */
   async clearAll(): Promise<void> {
