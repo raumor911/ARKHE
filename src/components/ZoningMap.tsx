@@ -229,7 +229,7 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
               fontWeight="bold"
               className="pointer-events-none select-none uppercase"
             >
-              {block.name}
+              {block.name || block.label || block.id || "NODO_SISTEMICO"}
             </text>
 
             {block.isLocked && (

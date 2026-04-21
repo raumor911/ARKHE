@@ -60,6 +60,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ForceGraph } from '@graphnizer/force-graph'; // Importar la librería de grafo
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -185,12 +186,13 @@ export default function App() {
       };
 
       await storageService.saveProject(newProject);
-      setProjects([newProject, ...projects]);
+      setProjects(prev => [newProject, ...prev]);
       setActiveProjectId(newProject.id);
       setIsCreating(false);
       resetForm();
       toast.success('Expediente generado y persistido con éxito.');
     } catch (error) {
+      console.error("Error al crear o persistir el proyecto:", error);
       toast.error('Error en el motor lógico ARKHÉ.');
     } finally {
       setIsAnalyzing(false);
@@ -219,7 +221,7 @@ export default function App() {
       };
 
       await storageService.saveProject(updatedProject);
-      setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, analysis: result, history: updatedHistory, budget_per_m2: newBudget !== undefined ? newBudget : p.budget_per_m2 } : p));
       toast.success('Gobernanza completa: Objetivos ajustados y persistidos.');
     } catch (error) {
       toast.error('Error en el ciclo de recursividad ARKHÉ.');
@@ -251,7 +253,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-bg selection:bg-accent selection:text-white">
+    <div className="flex flex-col lg:flex-row h-screen bg-bg selection:bg-accent selection:text-white">
       <Toaster position="top-right" expand={true} richColors />
       
       {/* SIDEBAR: LEVEL 1 (EXPLORER) */}
@@ -418,7 +420,7 @@ export default function App() {
       </motion.aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative lg:h-screen">
         {/* HEADER: ENGINE STATUS */}
         <header className="h-16 border-b border-line px-6 flex items-center justify-between bg-surface/50 backdrop-blur-md sticky top-0 z-50 shrink-0">
           <div className="flex items-center gap-12">
@@ -745,13 +747,13 @@ function ProjectView({
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      className="flex-1 flex gap-6 overflow-hidden"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden"
     >
       {/* Panel 1: Synthesis (Left/Main) */}
-      <div className="flex-[3] tech-panel">
+      <div className="flex-[3] tech-panel flex flex-col overflow-hidden">
         <div className="tech-header">
           <div className="flex gap-4">
             <span className="tech-title">01. Síntesis Sistémica</span>
@@ -805,10 +807,10 @@ function ProjectView({
             <TabsContent value="overview" className="mt-0 h-full flex flex-col">
                <div className="flex-1 flex flex-col min-h-0 space-y-8">
                  <div className="grid grid-cols-3 gap-6 shrink-0">
-                   <MetricBox label="Causa" value={project.analysis.sociograma.causa} />
-                   <MetricBox label="Efecto" value={project.analysis.sociograma.efecto} />
-                   <MetricBox label="Objetivo" value={project.analysis.sociograma.objetivo} />
-                 </div>
+                    <MetricBox label="Causa" value={project.analysis.sociograma.causa} isLoading={isAnalyzing} />
+                    <MetricBox label="Efecto" value={project.analysis.sociograma.efecto} isLoading={isAnalyzing} />
+                    <MetricBox label="Objetivo" value={project.analysis.sociograma.objetivo} isLoading={isAnalyzing} />
+                  </div>
                  
                  <div className={cn(
                    "relative border-2 border-line rounded-2xl bg-slate-50 transition-all duration-500 shadow-inner group/socio",
@@ -1002,14 +1004,14 @@ function ProjectView({
                      EXPORTAR CSV (REVIT)
                    </Button>
                  </CardHeader>
-                 <CardContent className="p-0 flex-1 flex flex-col min-h-0">
+                 <CardContent className="p-0 flex-1 flex flex-col min-h-0 overflow-auto">
                     <ScrollArea className="h-[65vh] w-full rounded-md border border-line bg-surface">
                       <div className="min-w-[800px] p-4">
                         <div className="flex bg-bg border-b border-line py-2 px-4 font-black text-[10px] uppercase tracking-widest text-muted">
                           <div className="w-[120px]">Código</div>
                           <div className="flex-1">Nivel / Entidad</div>
                           <div className="w-[100px] text-right px-4">m²</div>
-                          <div className="w-[160px] text-left px-4">Requerimientos</div>
+                          <div className="flex-1 text-left px-4">Requerimientos</div>
                         </div>
                         {project.analysis?.system_tree.map((node) => (
                           <TreeRow key={node.id} node={node} depth={0} />
@@ -1034,14 +1036,56 @@ function ProjectView({
                                c === 'A' ? 'bg-emerald-500 text-white' : 
                                c === 'X' ? 'bg-destructive text-white' : 'bg-slate-50 text-slate-400'
                              )}>{c}</div>
-                             <span className="text-[8px] font-mono text-muted uppercase tracking-tighter">{c}</span>
                           </div>
                         ))}
                      </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase mt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-emerald-500 shrink-0" />
+                      <span>A: Absolutamente Necesario</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                      <span>E: Especialmente Importante</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                      <span>I: Importante</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                      <span>O: Ordinario</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                      <span>U: Sin Importancia</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-destructive shrink-0" />
+                      <span>X: Indeseable</span>
+                    </div>
+                  </div>
                   <ScrollArea className="flex-1 border border-line bg-surface shadow-inner">
                      <MutherGrid nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
                   </ScrollArea>
+                  <div className="mt-8 space-y-4">
+                    <div className="flex flex-col text-navy">
+                      <span className="text-[12px] font-black uppercase tracking-widest">3) Grafo de Interacción (Visualización Sistémica)</span>
+                      <span className="text-[10px] font-mono text-muted uppercase">Algoritmo MORPHO: Agrupación de Locales</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-0.5 bg-emerald-500 shrink-0" />
+                        <span>Líneas gruesas: Proximidad crítica ("A")</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-0.5 border-t-2 border-destructive border-dashed shrink-0" />
+                        <span>Líneas punteadas rojas: Proximidad indeseable ("X")</span>
+                      </div>
+                    </div>
+                    <InteractionGraph nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
+                  </div>
                   <div className="bg-amber/5 border-l-4 border-amber p-4 mt-2">
                      <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wider leading-relaxed">
                         ANÁLISIS DE MASA: Las relaciones de clase "A" y "E" activan vectores de atracción en el motor MORPHO. 
@@ -1067,7 +1111,7 @@ function ProjectView({
                               <Badge variant="outline" className="text-[9px] border-accent text-accent uppercase font-black tracking-widest px-2">Axon-Fin Consulting</Badge>
                               <span className="text-[10px] font-mono text-white/60">ESTIMACIÓN PARAMÉTRICA v3.6</span>
                            </div>
-                           <h3 className="text-2xl font-black uppercase tracking-tight">Inversión Sugerida: <span className="text-accent">${project.analysis.budget_validation.estimated_investment.min.toLocaleString()} - ${project.analysis.budget_validation.estimated_investment.max.toLocaleString()} MXN</span></h3>
+                           <h3 className="text-2xl font-black uppercase tracking-tight">Inversión Sugerida: <span className="text-accent">${project.analysis.budget_validation.estimated_investment?.min?.toLocaleString() || 'N/A'} - ${project.analysis.budget_validation.estimated_investment?.max?.toLocaleString() || 'N/A'} MXN</span></h3>
                            <p className="text-[11px] text-white/70 max-w-2xl italic leading-loose">
                               Cálculo basado en <b>{project.analysis.budget_validation.total_m2}m²</b> proyectados y requerimientos técnicos detectados. Grado de confianza: <b>{project.analysis.budget_validation.estimated_investment.confidence}</b>.
                            </p>
@@ -1075,7 +1119,7 @@ function ProjectView({
                         <div className="flex flex-col items-center gap-3 bg-white/5 p-4 border border-white/10 backdrop-blur-md">
                            <div className="text-center">
                               <div className="text-[9px] font-black uppercase text-accent mb-1 tracking-widest">Promedio Sugerido</div>
-                              <div className="text-xl font-mono">${project.analysis.budget_validation.estimated_investment.avg_per_m2.toLocaleString()} <span className="text-[10px] opacity-40">/m²</span></div>
+                              <div className="text-xl font-mono">${project.analysis.budget_validation.estimated_investment?.avg_per_m2?.toLocaleString() || 'N/A'} <span className="text-[10px] opacity-40">/m²</span></div>
                            </div>
                            <div className="flex gap-2">
                              {['Interés Social', 'Medio', 'Lujo'].map(level => (
@@ -1304,189 +1348,7 @@ function ProjectView({
         </AnimatePresence>
       </div>
 
-      {/* Panel 2: Validation (Right) */}
-      <div className="flex-[2] flex flex-col gap-6 overflow-hidden">
-        <div className="flex-1 tech-panel min-h-0 relative">
-          <div className="tech-header">
-            <span className="tech-title">02. Validación Morpho</span>
-            <div className="flex items-center gap-2">
-               <span className="text-[9px] font-mono text-muted uppercase">Interaction Matrix</span>
-               <div className={cn(
-                 "w-2 h-2 rounded-full",
-                 project.analysis?.budget_validation.alert ? "bg-destructive animate-pulse" : "bg-emerald-500"
-               )} />
-            </div>
-          </div>
-          
-          {project.analysis?.budget_validation.alert && (
-            <div className="absolute inset-0 z-40 bg-navy/60 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center text-white">
-              <div className="w-16 h-16 border-4 border-destructive rounded-none flex items-center justify-center mb-6">
-                <AlertTriangle size={32} className="text-destructive" />
-              </div>
-              <h3 className="text-xl font-black uppercase tracking-tighter mb-2">Acceso Bloqueado // Morpho Gate</h3>
-              <p className="text-xs opacity-80 mb-8 max-w-xs uppercase font-bold tracking-widest leading-relaxed">
-                Desviación presupuestal crítica detectada ({project.analysis.budget_validation.deviation}%). La gobernanza recursiva impide la optimización formal hasta ajustar los objetivos base.
-              </p>
-              
-              {!adjusting ? (
-                <Button 
-                  className="bg-accent hover:bg-[#007070] text-white rounded-none h-11 px-6 font-black tracking-widest text-[10px] uppercase shadow-2xl"
-                  onClick={() => setAdjusting(true)}
-                >
-                  AJUSTAR OBJETIVOS ESTRATÉGICOS
-                </Button>
-              ) : (
-                <div className="w-full space-y-4">
-                  <textarea 
-                    className="w-full bg-navy/40 border border-white/20 p-4 text-xs font-mono text-white placeholder:text-white/20 h-24 rounded-none outline-none focus:border-accent transition-all"
-                    placeholder="Instrucciones de ajuste (ej: reducir área de dormitorios, buscar materiales económicos)..."
-                    value={adjText}
-                    onChange={(e) => setAdjText(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Button 
-                      className="flex-1 bg-white text-navy font-black text-[10px] uppercase tracking-widest h-10 rounded-none hover:bg-slate-200"
-                      onClick={() => setAdjusting(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button 
-                      disabled={isAnalyzing || !adjText}
-                      className="flex-[2] bg-accent text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-none hover:bg-[#007070]"
-                      onClick={async () => {
-                        await onReAnalyze(project.id, adjText);
-                        setAdjusting(false);
-                        setAdjText('');
-                      }}
-                    >
-                      {isAnalyzing ? "RE-ANALIZANDO..." : "RE-INYECTAR CONTEXTO"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <ScrollArea className="flex-1">
-            <div className="p-6 space-y-6">
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
-                   <span className="technical-label">Matriz de proximidad (MUTHER)</span>
-                   <div className="flex gap-2">
-                      {['A','E','I','O','U','X'].map(v => (
-                        <div key={v} className="flex items-center gap-1">
-                          <div className={cn(
-                            "w-2 h-2",
-                            v === 'A' && "bg-accent",
-                            v === 'X' && "bg-destructive",
-                            v === 'U' && "bg-bg border border-line"
-                          )} />
-                          <span className="text-[8px] font-bold">{v}</span>
-                        </div>
-                      ))}
-                   </div>
-                </div>
-                
-                <div className="matrix-grid">
-                  {project.analysis.interaction_matrix.slice(0, 36).map((rel, i) => (
-                    <div 
-                      key={i} 
-                      className={cn(
-                        "matrix-cell",
-                        rel.clase === 'A' && "cell-high",
-                        rel.clase === 'X' && "cell-critical",
-                        // Fallback for visual variety in empty cells if needed
-                        (rel.clase === 'U' || !rel.clase) && "hover:bg-bg"
-                      )}
-                      title={`${rel.from} → ${rel.to}: ${rel.razon}`}
-                    >
-                      {rel.clase}
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Recursivity Alerta / Estimation Insights */}
-              {project.analysis.budget_validation.estimated_investment && (
-                <div className="p-4 border border-navy/20 bg-navy/5 space-y-3">
-                   <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-navy uppercase tracking-widest">Proyección de Inversión</span>
-                      <Badge className="bg-navy text-white text-[8px] rounded-none">Paramétrico</Badge>
-                   </div>
-                   <div className="flex items-end justify-between border-b border-navy/10 pb-2">
-                      <div className="flex flex-col">
-                         <span className="text-[9px] text-muted font-mono uppercase">Promedio Sugerido</span>
-                         <span className="text-lg font-mono font-bold text-navy">${project.analysis.budget_validation.estimated_investment.avg_per_m2.toLocaleString()}</span>
-                      </div>
-                      <div className="flex flex-col items-end">
-                         <span className="text-[9px] text-muted font-mono uppercase">Rango (Min/Max)</span>
-                         <span className="text-[11px] font-mono text-navy">${(project.analysis.budget_validation.estimated_investment.min/1000000).toFixed(1)}M - ${(project.analysis.budget_validation.estimated_investment.max/1000000).toFixed(1)}M</span>
-                      </div>
-                   </div>
-                </div>
-              )}
-
-              {project.analysis.budget_validation.alert && (
-                <motion.div 
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-4 bg-amber/10 border-l-4 border-amber space-y-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={14} className="text-amber" />
-                    <span className="text-[10px] font-black text-amber uppercase tracking-widest">MORPHO ALERT // RECURSIVIDAD</span>
-                  </div>
-                  <p className="text-[11px] text-navy italic leading-snug">
-                    {project.analysis.budget_validation.recommendation}
-                  </p>
-                  <div className="flex justify-between items-center text-[10px] font-mono border-t border-amber/20 pt-2 text-amber">
-                    <span>Desviación Presupuesto</span>
-                    <span className="font-bold">{project.analysis.budget_validation.deviation}%</span>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Technical Output JSON */}
-              <div className="space-y-3">
-                 <div className="flex justify-between items-center">
-                    <span className="technical-label">ARKHÉ Technical Output</span>
-                    <button 
-                      className="text-[9px] font-bold text-accent hover:underline flex items-center gap-1"
-                      onClick={() => {
-                        const blob = new Blob([JSON.stringify(project.analysis, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `arkhe-${project.id}.json`;
-                        a.click();
-                      }}
-                    >
-                      EXPORT_JSON <ExternalLink size={10} />
-                    </button>
-                 </div>
-                 <div className="json-viewport h-[180px] relative overflow-hidden">
-                    <div className="absolute inset-0 overflow-auto scrollbar-hide p-4">
-                       <pre className="text-[10px] leading-tight text-accent opacity-80">
-                         {JSON.stringify(project.analysis, null, 2)}
-                       </pre>
-                    </div>
-                 </div>
-              </div>
-            </div>
-          </ScrollArea>
-        </div>
-        
-        {/* Quick Actions Panel */}
-        <div className="h-14 tech-panel flex-row items-center px-4 justify-between bg-navy shrink-0">
-          <div className="flex items-center gap-2">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Expediente Audit-Ready</span>
-          </div>
-          <Button variant="outline" className="h-8 rounded-none border-white/20 text-white bg-white/5 hover:bg-white/10 text-[9px] font-bold py-0">
-             MARCAR COMO AUDITADO
-          </Button>
-        </div>
-      </div>
     </motion.div>
   );
 }
@@ -1515,7 +1377,7 @@ function TreeRow({ node, depth }: { node: SystemNode; depth: number; key?: any }
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="w-[104px] shrink-0 font-mono text-[9px] text-accent font-bold flex items-center gap-2">
-          {node.code}
+          {node.code || '--'}
           {node.children && node.children.length > 0 && (
             <ChevronDown size={10} className={cn("transition-transform duration-300", !isOpen && "-rotate-90")} />
           )}
@@ -1545,8 +1407,8 @@ function TreeRow({ node, depth }: { node: SystemNode; depth: number; key?: any }
           {node.calculated_m2 ? `${node.calculated_m2}m²` : '--'}
         </div>
 
-        <div className="w-[160px] flex gap-1 px-4 items-center h-full">
-          {node.type === 'Local' && node.requirements ? (
+        <div className="flex-1 flex gap-1 px-4 items-center h-full">
+          {node.requirements ? (
             <>
               <RequirementBadge r="F" text={node.requirements.r1_funcional} />
               <RequirementBadge r="E" text={node.requirements.r2_espacial} />
@@ -1578,11 +1440,17 @@ function TreeRow({ node, depth }: { node: SystemNode; depth: number; key?: any }
   );
 }
 
-function MetricBox({ label, value }: { label: string; value: string }) {
+function MetricBox({ label, value, isLoading }: { label: string; value?: string; isLoading?: boolean }) {
   return (
     <div className="p-4 border border-line bg-surface flex flex-col gap-1 transition-all hover:border-accent group">
-      <span className="label-micro text-muted group-hover:text-accent">{label}</span>
-      <p className="text-[11px] font-bold text-navy uppercase leading-tight">{value}</p>
+      <span className="text-[10px] font-bold text-navy/50 uppercase tracking-tighter mb-1">{label}</span>
+      {isLoading ? (
+        <div className="h-4 w-full bg-slate-200 animate-pulse rounded" />
+      ) : (
+        <p className="text-[11px] font-bold text-navy uppercase leading-tight">
+          {value && value !== "" ? value : "DEFINIR POR DISEÑO"}
+        </p>
+      )}
     </div>
   );
 }
@@ -1662,6 +1530,53 @@ function EmptyState({ onStart, isAnalyzing }: { onStart: () => void; isAnalyzing
           NUEVA INGESTA
         </Button>
       </motion.div>
+    </div>
+  );
+}
+
+interface GraphNode {
+  id: string;
+  name: string;
+  x?: number;
+  y?: number;
+}
+
+interface GraphLink {
+  source: string;
+  target: string;
+  value: number;
+  type: 'A' | 'X' | string;
+}
+
+function InteractionGraph({ nodes, interactions }: { nodes: SystemNode[]; interactions: any[] }) {
+  const graphData = useMemo(() => {
+    const graphNodes: GraphNode[] = nodes.map(node => ({ id: node.id, name: node.name }));
+    const graphLinks: GraphLink[] = interactions
+      .filter(interaction => interaction.from_id && interaction.to_id)
+      .map(interaction => ({
+      source: interaction.from_id,
+      target: interaction.to_id,
+      value: interaction.clase === 'A' ? 3 : interaction.clase === 'X' ? 1 : 0.5, // Grosor de la línea
+      type: interaction.clase,
+    }));
+
+    return { nodes: graphNodes, links: graphLinks };
+  }, [nodes, interactions]);
+
+  return (
+    <div className="w-full h-full border border-line bg-surface">
+      <ForceGraph
+        data={graphData}
+        nodeColor="#002F56"
+        linkColor={link => link.type === 'A' ? '#007070' : link.type === 'X' ? '#ef4444' : '#cccccc'}
+        linkWidth={link => link.value}
+        linkStyle={link => link.type === 'X' ? 'dashed' : 'straight'}
+        showArrows={true}
+        showNodeLabels={true}
+        nodeLabel="name"
+        width={null} // Ajusta el ancho según sea necesario
+        height={null} // Ajusta la altura según sea necesario
+      />
     </div>
   );
 }
