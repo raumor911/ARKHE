@@ -1,80 +1,76 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { SpektrResult } from "../types";
+import { SpektrResult, ChatMessage } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 const SYSTEM_INSTRUCTION = `
-Actúa como el Motor Lógico de Arquitectura "ARKHÉ". Tu función es transformar el Brief (texto) y los Archivos (PDF/Imágenes) proporcionados por el usuario en un expediente técnico funcional con un 80% de validez técnica.
+Actúa como el Motor de Gobernanza "ARKHÉ v3.7". Tu función es implementar una Reingeniería Sistémica basada en el Método Cuantitativo de Sánchez y realizar la SÍNTESIS ESPACIAL (MORPHO).
 
-### REGLA DE ORO:
-El Brief y los Archivos adjuntos son la ÚNICA fuente de verdad. No inventes requerimientos que no estén sustentados en la información proporcionada. Si la información es insuficiente, realiza inferencias lógicas basadas estrictamente en los estándares de habitabilidad derivados del contexto dado.
+### RESTRUCTURACIÓN ESTRATÉGICA (D0-D2):
+1. **D0: SOCIOGRAMA (Trazabilidad Forzada):** Debes mapear explícitamente cada Objetivo a una Causa detectada. No permitas objetivos huérfanos.
+2. **D1: ÁRBOL DEL SISTEMA (Jerarquía Profunda):** Genera una estructura recursiva de 4 niveles usando la propiedad "children[]".
+   - Jerarquía: Sistema (Raíz) -> Subsistema -> Componente -> Local (Hoja).
+   - Codificación: Usa códigos secuenciales tipo "D1.1", "D1.1.1", "D1.1.1.1".
+   - Requerimientos: Solo los niveles de "Local" deben tener los 5 requerimientos particulares (r1_funcional, r2_espacial, r3_tecnico, r4_psicologico, r5_flexibilidad).
+3. **D2: MEDIOS OPERATIVOS (Parámetros):** Categoriza cada uno de los 6 Medios (M1-M6) por importancia (Imprescindible, Conveniente, Accesoria) y deriva automáticamente un Requerimiento General (RG) operativo para cada uno.
 
-### ESTRUCTURA DE AGENTES INTERNOS:
-1. STRATOS (Analista de Contexto): Procesa el input multimodal. Extrae los 6 medios (Humano, Económico, Físico, Climático, Tecnológico y Jurídico). Define la relación Causa-Efecto-Objetivo (Sociograma).
-2. AXON (Arquitecto de Sistemas): Traduce los objetivos de STRATOS en un Árbol de Sistema (Jerarquía: Sistema -> Subsistema -> Local). Calcula áreas (m2) basadas en el mobiliario y normas de habitabilidad.
-3. MORPHO (Gobernante de Requerimientos): Genera la Matriz de Interacción (Muther) y el Grafo de Adyacencias. Aplica lógica de organización funcional y técnica de locales.
+### GOBERNANZA Y MODO ESTIMACIÓN (AXON-FIN):
+- **MODO ESTIMACIÓN:** Si el presupuesto base (budget_per_m2) es 0 o nulo, activa el "Modo Estimación".
+- **COSTOS PARAMÉTRICOS (Ref. 2026):** Utiliza rangos base para CDMX/México (Social: $10-14k, Media: $15-22k, Lujo: $25-45k+).
+- **ALERTA PROACTIVA:** Si el costo estimado por m2 supera el rango de mercado, reporta "alert: true".
 
-### MARCO TEÓRICO (MÉTODO CUANTITATIVO):
-Usa el "Método Cuantitativo de Diseño Arquitectónico" de Álvaro Sánchez.
-- Medios (M1-M6): Humano, Económico, Físico-Climático, Tecnológico, Urbano-Político.
-- Requerimientos Particulares (R1-R5):
-  - R1: Ubicación (Accesos, posiciones).
-  - R2: Función (Jerarquías, circulaciones, mobiliario).
-  - R3: Construcción (Alturas, instalaciones, materiales).
-  - R4: Percepción (Aislamiento, ventilación, sensaciones).
-  - R5: Desarrollo (Crecimiento, flexibilidad, mantenimiento).
-
-### PROTOCOLO DE PROCESAMIENTO:
-- FASE 1 - INGESTA: Analiza archivos (PDF, Imágenes) y texto del usuario.
-- FASE 2 - DIAGNÓSTICO: Identifica locales, usuarios y restricciones.
-- FASE 3 - SALIDA TÉCNICA: Genera un objeto JSON estructurado conforme al esquema solicitado.
+### SÍNTESIS ESPACIAL (MORPHO):
+- **SPATIAL LAYOUT:** Genera una zonificación preliminar (spatial_layout) para todos los elementos tipo "Local" definidos en D1.
+- **ALGORITMO PIN-PACKING:**
+  - Zonas: "Privado" (Dormitorios, Baños), "Social" (Estancia, Comedor), "Servicio" (Cocina, Lavandería).
+  - Coordenadas: x e y (0 a 100), w y h (dimensiones proporcionales).
+  - Área Lógica: El producto (w * h) debe ser proporcional a 'calculated_m2' del local.
+  - Adyacencia MUTHER: Los locales con relación "A" en la Matriz de Interacción deben tener coordenadas x, y contiguas para representar atracción geométrica.
 
 ### REQUISITO DE RESPUESTA:
-Debes devolver UNICAMENTE un objeto JSON válido que siga este esquema:
+Devuelve UNICAMENTE un objeto JSON siguiendo este esquema:
 {
   "sociograma": { "causa": string, "efecto": string, "objetivo": string },
-  "medios": { "Humano": string, "Económico": string, "Físico": string, "Climático": string, "Tecnológico": string, "Jurídico": string },
-  "system_tree": [
-    { "id": string, "local": string, "subsistema": string, "m2_estimado": number, "requerimientos": { "r1": string, "r2": string, "r3": string, "r4": string, "r5": string } }
+  "medios": { ... },
+  "system_tree": [ ... ],
+  "interaction_matrix": [ ... ],
+  "spatial_layout": [
+    { "id": string, "name": string, "zone": "Privado" | "Social" | "Servicio", "x": number, "y": number, "w": number, "h": number }
   ],
-  "interaction_matrix": [
-    { "from": string, "to": string, "clase": "A" | "E" | "I" | "O" | "U" | "X", "razon": string }
-  ],
-  "budget_validation": { 
-     "total_m2": number, 
-     "budget_m2": number, 
-     "deviation": number, 
-     "alert": boolean, 
-     "recommendation": string 
-  }
+  "budget_validation": { ... },
+  "normative_confidence_score": number
 }
 `;
 
 export async function analyzeProject(
   prompt: string, 
-  files: { data: string; mimeType: string }[]
-): Promise<SpektrResult> {
+  files: { data: string; mimeType: string }[],
+  history: ChatMessage[] = []
+): Promise<{ result: SpektrResult; updatedHistory: ChatMessage[] }> {
   const model = "gemini-3.1-pro-preview"; // Best for complex architectural reasoning
 
   const fileParts = files.map(f => ({
-    inlineData: {
-      data: f.data.split(',')[1] || f.data,
-      mimeType: f.mimeType
-    }
+    parts: [{
+      inlineData: {
+        data: f.data.split(',')[1] || f.data,
+        mimeType: f.mimeType
+      }
+    }]
   }));
 
-  const userPrompt = `
-    BRIEF DEL USUARIO (CONTEXTO): "${prompt}"
+  const userPromptText = `
+    ${history.length > 0 ? 'RE-ANÁLISIS E ITERACIÓN // NUEVAS INSTRUCCIONES:' : 'INICIO DE ANÁLISIS // BRIEF:'} "${prompt}"
     
-    INSTRUCCIÓN: Analiza exhaustivamente el Brief anterior y los Archivos adjuntos para generar el expediente técnico ARKHÉ. Extrae locales, dimensiones y requerimientos basándote únicamente en estos inputs.
+    INSTRUCCIÓN: Analiza el input multimodal. Si es una iteración, considera las decisiones previas y ajusta el Árbol Sistémico y la Matriz según sea necesario. Reporta alertas de presupuesto si el área m2 proyectada no es coherente con el presupuesto por m2 definido.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model,
       contents: [
+        ...history,
         ...fileParts,
-        { text: userPrompt }
+        { role: 'user' as const, parts: [{ text: userPromptText }] }
       ],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -82,7 +78,17 @@ export async function analyzeProject(
       }
     });
 
-    return JSON.parse(response.text || '{}') as SpektrResult;
+    const resultText = response.text || '{}';
+    const result = JSON.parse(resultText) as SpektrResult;
+    
+    // Construct updated history
+    const updatedHistory: ChatMessage[] = [
+      ...history,
+      { role: 'user', parts: [{ text: userPromptText }] },
+      { role: 'model', parts: [{ text: resultText }] }
+    ];
+
+    return { result, updatedHistory };
   } catch (error) {
     console.error("SPEKTR Engine Error:", error);
     throw error;

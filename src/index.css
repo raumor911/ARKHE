@@ -5,19 +5,19 @@
   --color-bg: #F8F9FA;
   --color-surface: #FFFFFF;
   --color-line: #D1D5DB;
-  --color-accent: #008B8B;
-  --color-navy: #00416A;
-  --color-ink: #002D4A;
+  --color-accent: #00E0FF;
+  --color-navy: #002F56;
+  --color-ink: #001A30;
   --color-muted: #6B7280;
   --color-amber: #F59E0B;
   
-  --color-primary: #00416A;
+  --color-primary: #002F56;
   --color-primary-foreground: #FFFFFF;
-  --color-secondary: #008B8B;
-  --color-secondary-foreground: #FFFFFF;
+  --color-secondary: #00E0FF;
+  --color-secondary-foreground: #002F56;
   --color-destructive: #EF4444;
   --color-destructive-foreground: #FFFFFF;
-  --color-ring: #008B8B;
+  --color-ring: #00E0FF;
   --color-input: #D1D5DB;
   --color-border: #D1D5DB;
   
@@ -28,6 +28,14 @@
   --radius-lg: 0.5rem;
   --radius-md: calc(0.5rem - 2px);
   --radius-sm: calc(0.5rem - 4px);
+
+  --animate-scan: scan 2s linear infinite;
+
+  @keyframes scan {
+    0% { top: 0%; opacity: 0; }
+    50% { opacity: 0.8; }
+    100% { top: 100%; opacity: 0; }
+  }
 }
 
 @layer base {

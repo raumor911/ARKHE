@@ -20,7 +20,9 @@ import {
   Info,
   Database,
   Maximize2,
-  Minimize2
+  Minimize2,
+  FolderOpen,
+  ArrowRight
 } from 'lucide-react';
 import {
   Table,
@@ -41,7 +43,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast, Toaster } from 'sonner';
 import { analyzeProject } from './lib/gemini';
 import { storageService } from './lib/storage';
-import { Project, SpektrResult } from './types';
+import { Project, SpektrResult, SystemNode, SpatialBlock } from './types';
+import { ArkheLogo } from './components/branding/Logo';
+import { ZoningMap } from './components/ZoningMap';
 import { cn } from './lib/utils';
 import { 
   Dialog, 
@@ -162,9 +166,10 @@ export default function App() {
     toast.info('ARKHÉ: Iniciando motores de agentes STRATOS, AXON y MORPHO...');
 
     try {
-      const result = await analyzeProject(
+      const { result, updatedHistory } = await analyzeProject(
         newDesc,
-        uploadedFiles.map(f => ({ data: f.data, mimeType: f.type }))
+        uploadedFiles.map(f => ({ data: f.data, mimeType: f.type })),
+        [] // Initial history is empty
       );
 
       const newProject: Project = {
@@ -174,7 +179,8 @@ export default function App() {
         budget_per_m2: newBudget,
         createdAt: new Date().toISOString(),
         files: uploadedFiles,
-        analysis: result
+        analysis: result,
+        history: updatedHistory
       };
 
       await storageService.saveProject(newProject);
@@ -185,6 +191,37 @@ export default function App() {
       toast.success('Expediente generado y persistido con éxito.');
     } catch (error) {
       toast.error('Error en el motor lógico ARKHÉ.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleReAnalyze = async (projectId: string, adjustments: string, newBudget?: number) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
+    setIsAnalyzing(true);
+    toast.info('ARKHÉ: Re-inyectando contexto y ajustando objetivos (Recursividad)...');
+
+    try {
+      const { result, updatedHistory } = await analyzeProject(
+        adjustments,
+        project.files.map(f => ({ data: f.data, mimeType: f.type })),
+        project.history || []
+      );
+
+      const updatedProject: Project = {
+        ...project,
+        budget_per_m2: newBudget !== undefined ? newBudget : project.budget_per_m2,
+        analysis: result,
+        history: updatedHistory
+      };
+
+      await storageService.saveProject(updatedProject);
+      setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
+      toast.success('Gobernanza completa: Objetivos ajustados y persistidos.');
+    } catch (error) {
+      toast.error('Error en el ciclo de recursividad ARKHÉ.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -226,10 +263,15 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }}
-              className="font-black text-xl tracking-[0.3em] text-navy"
+              className="flex-1"
             >
-              ARKHÉ
+              <ArkheLogo variant="full" size={32} isAnalyzing={isAnalyzing} />
             </motion.div>
+          )}
+          {isSidebarCollapsed && (
+            <div className="flex-1 flex justify-center">
+              <ArkheLogo variant="icon" size={28} isAnalyzing={isAnalyzing} />
+            </div>
           )}
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -377,21 +419,25 @@ export default function App() {
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* HEADER: ENGINE STATUS */}
-        <header className="h-16 border-b border-line px-6 flex items-center justify-between bg-surface/50 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Activity size={18} className="text-accent" />
-              <div className="flex flex-col leading-none">
-                <span className="text-[10px] font-black text-navy uppercase tracking-widest">Motor Lógico</span>
-                <span className="text-[8px] font-mono text-muted">AISTUDIO_GEMINI_PRO</span>
+        <header className="h-16 border-b border-line px-6 flex items-center justify-between bg-surface/50 backdrop-blur-md sticky top-0 z-50 shrink-0">
+          <div className="flex items-center gap-12">
+            <ArkheLogo variant="full" size={36} isAnalyzing={isAnalyzing} className="hidden lg:flex" />
+            
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Activity size={18} className="text-accent" />
+                <div className="flex flex-col leading-none">
+                  <span className="text-[10px] font-black text-navy uppercase tracking-widest">Motor Lógico</span>
+                  <span className="text-[8px] font-mono text-muted">AISTUDIO_GEMINI_PRO</span>
+                </div>
               </div>
-            </div>
-            <div className="h-8 w-[1px] bg-line" />
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-accent text-accent bg-accent/5 rounded-none text-[9px] py-0 px-1.5 h-5 flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                AR-TRACE: ACTIVE
-              </Badge>
+              <div className="h-8 w-[1px] bg-line" />
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="border-accent text-accent bg-accent/5 rounded-none text-[9px] py-0 px-1.5 h-5 flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  AR-TRACE: ACTIVE
+                </Badge>
+              </div>
             </div>
           </div>
 
@@ -404,9 +450,14 @@ export default function App() {
         <div className="flex-1 p-6 overflow-hidden flex flex-col gap-6">
           <AnimatePresence mode="wait">
             {activeProject ? (
-              <ProjectView key={activeProject.id} project={activeProject} />
+              <ProjectView 
+                key={activeProject.id} 
+                project={activeProject} 
+                onReAnalyze={handleReAnalyze}
+                isAnalyzing={isAnalyzing}
+              />
             ) : (
-              <EmptyState onStart={() => setIsCreating(true)} />
+              <EmptyState onStart={() => setIsCreating(true)} isAnalyzing={isAnalyzing} />
             )}
           </AnimatePresence>
         </div>
@@ -558,8 +609,82 @@ export default function App() {
   );
 }
 
-function ProjectView({ project }: { project: Project; key?: any }) {
+function ProjectView({ 
+  project, 
+  onReAnalyze, 
+  isAnalyzing 
+}: { 
+  project: Project; 
+  onReAnalyze: (id: string, adj: string, budget?: number) => Promise<void>; 
+  isAnalyzing: boolean;
+  key?: any;
+}) {
   const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
+  const [adjText, setAdjText] = useState('');
+  const [isReferenceOpen, setIsReferenceOpen] = useState(false);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | undefined>();
+
+  const selectedBlock = project.analysis?.spatial_layout?.find(b => b.id === selectedBlockId);
+  const blockDetails = (() => {
+    if (!selectedBlock || !project.analysis) return null;
+    let found: SystemNode | null = null;
+    const search = (nodes: SystemNode[]) => {
+      for (const n of nodes) {
+        if (n.name === selectedBlock.name) { found = n; break; }
+        if (n.children) search(n.children);
+      }
+    };
+    search(project.analysis.system_tree);
+    return found;
+  })();
+
+  const isEstimationMode = !project.budget_per_m2 || project.budget_per_m2 === 0;
+
+  const handleFixBudget = async () => {
+    if (!project.analysis?.budget_validation.estimated_investment) return;
+    const avg = project.analysis.budget_validation.estimated_investment.avg_per_m2;
+    await onReAnalyze(project.id, `FIJAR PRESUPUESTO SUGERIDO POR AXON-FIN: $${avg} MXN/m2. Proceder con validación técnica MORPHO.`, avg);
+  };
+
+  const downloadCSV = () => {
+    if (!project.analysis) return;
+    
+    // Flatten logic for recursive tree
+    const flatRows: any[] = [];
+    const flatten = (nodes: SystemNode[]) => {
+      nodes.forEach(node => {
+        if (node.type === 'Local') {
+          flatRows.push({
+            code: node.code,
+            name: node.name,
+            m2: node.calculated_m2,
+            r1: node.requirements?.r1_funcional,
+            r2: node.requirements?.r2_espacial,
+            r3: node.requirements?.r3_tecnico,
+            r4: node.requirements?.r4_psicologico,
+            r5: node.requirements?.r5_flexibilidad
+          });
+        }
+        if (node.children) flatten(node.children);
+      });
+    };
+    
+    flatten(project.analysis.system_tree);
+
+    const headers = "Code,Name,Calculated_m2,R1_Funcional,R2_Espacial,R3_Tecnico,R4_Psicologico,R5_Flexibilidad\n";
+    const rows = flatRows.map(item => {
+      return `${item.code},"${item.name}",${item.m2},"${item.r1}","${item.r2}","${item.r3}","${item.r4}","${item.r5}"`;
+    }).join("\n");
+    
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `arkhe-v3.5-sintesis-${project.name.replace(/\s+/g, '_')}.csv`;
+    a.click();
+    toast.success("CSV Jerárquico Revit-Ready generado.");
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -587,6 +712,27 @@ function ProjectView({ project }: { project: Project; key?: any }) {
             <span className="tech-title text-muted font-normal underline decoration-accent/30 lowercase italic">Stratos & Axon Logic</span>
           </div>
           <div className="flex items-center gap-2">
+             <Button 
+               variant="outline" 
+               size="xs" 
+               className={cn(
+                 "h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black transition-all",
+                 isReferenceOpen ? "bg-navy text-white" : ""
+               )}
+               onClick={() => setIsReferenceOpen(!isReferenceOpen)}
+             >
+               <FolderOpen size={12} />
+               {isReferenceOpen ? "Cerrar Referencia" : "Referencia Técnica"}
+             </Button>
+             <div className="h-4 w-[1px] bg-line mx-2" />
+             {project.analysis?.normative_confidence_score !== undefined && (
+               <Badge variant="outline" className={cn(
+                 "text-[9px] rounded-none py-0 h-4 uppercase tracking-tighter",
+                 project.analysis.normative_confidence_score > 0.8 ? "text-emerald-500 border-emerald-500" : "text-amber border-amber"
+               )}>
+                 Confidence: {(project.analysis.normative_confidence_score * 100).toFixed(0)}%
+               </Badge>
+             )}
              <Badge variant="outline" className="text-[9px] rounded-none py-0 h-4 uppercase tracking-tighter">Valid: 80%</Badge>
           </div>
         </div>
@@ -597,7 +743,13 @@ function ProjectView({ project }: { project: Project; key?: any }) {
               <TabTrigger value="overview" label="D0. Sociograma" sub="Causa-Efecto" />
               <TabTrigger value="sintesis" label="D1. Síntesis" sub="Árbol Técnico" />
               <TabTrigger value="medios" label="D2. Medios" sub="Diagnóstico" />
-              <TabTrigger value="files" label="D3. Documentos" sub="Ingesta" />
+              <TabTrigger value="arquitectura" label="D3. Arquitectura" sub="Zonificación" />
+              {isEstimationMode && (
+                <div className="flex items-center gap-2 px-4 border-l border-line ml-auto">
+                   <div className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse" />
+                   <span className="text-[9px] font-black text-amber uppercase tracking-widest">Modo Estimación Activo</span>
+                </div>
+              )}
             </TabsList>
           </div>
 
@@ -787,126 +939,355 @@ function ProjectView({ project }: { project: Project; key?: any }) {
 
             <TabsContent value="sintesis" className="mt-0 h-full flex flex-col overflow-hidden">
                <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none bg-transparent">
-                 <CardHeader className="px-0 pb-4">
+                 <CardHeader className="px-0 pb-4 flex flex-row items-center justify-between">
                    <CardTitle className="text-navy flex items-center gap-2 text-sm uppercase tracking-widest font-black">
                      <Database className="h-4 w-4 text-accent" />
-                     Síntesis Sistémica (D0, D1, D2, D3)
+                     Síntesis Sistémica (Jerarquía v3.5)
                    </CardTitle>
+                   <Button 
+                    variant="outline" 
+                    className="h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black"
+                    onClick={downloadCSV}
+                    disabled={!project.analysis}
+                   >
+                     <Upload size={12} className="rotate-180" />
+                     EXPORTAR CSV (REVIT)
+                   </Button>
                  </CardHeader>
                  <CardContent className="p-0 flex-1 flex flex-col min-h-0">
                     <ScrollArea className="h-[65vh] w-full rounded-md border border-line bg-surface">
-                      <div className="min-w-[800px]">
-                        <Table>
-                          <TableHeader className="bg-bg sticky top-0 z-20 shadow-sm">
-                            <TableRow className="hover:bg-transparent border-line">
-                              <TableHead className="w-[100px] text-[10px] font-black uppercase tracking-widest text-muted">Código</TableHead>
-                              <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted">Nivel / Local</TableHead>
-                              <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted">Subsistema</TableHead>
-                              <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-muted">m² Est.</TableHead>
-                              <TableHead className="text-[10px] font-black uppercase tracking-widest text-muted">Requerimientos (R1-R5)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {project.analysis?.system_tree.map((item, index) => (
-                              <TableRow key={item.id} className="border-line hover:bg-navy/[0.02] transition-colors">
-                                <TableCell className="font-mono text-[10px] text-accent font-bold">
-                                  {item.id.substring(0, 8).toUpperCase()}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 rounded-none bg-navy text-white border-navy">
-                                      D1
-                                    </Badge>
-                                    <span className="text-[12px] font-bold text-navy">{item.local}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-[11px] text-muted font-medium">
-                                  {item.subsistema}
-                                </TableCell>
-                                <TableCell className="text-right font-mono font-bold text-navy text-[11px]">
-                                  {item.m2_estimado}m²
-                                </TableCell>
-                                <TableCell className="py-2">
-                                  <div className="flex gap-1">
-                                    {Object.entries(item.requerimientos).map(([key, val]) => (
-                                      <RequirementBadge key={key} r={key} text={val} />
-                                    ))}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                            {(!project.analysis?.system_tree || project.analysis.system_tree.length === 0) && (
-                              <TableRow>
-                                <TableCell colSpan={5} className="h-32 text-center">
-                                  <div className="flex flex-col items-center justify-center gap-2 text-muted">
-                                    <Search size={24} className="opacity-20" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">Sin registros sistémicos</span>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
+                      <div className="min-w-[800px] p-4">
+                        <div className="flex bg-bg border-b border-line py-2 px-4 font-black text-[10px] uppercase tracking-widest text-muted">
+                          <div className="w-[120px]">Código</div>
+                          <div className="flex-1">Nivel / Entidad</div>
+                          <div className="w-[100px] text-right px-4">m²</div>
+                          <div className="w-[160px] text-left px-4">Requerimientos</div>
+                        </div>
+                        {project.analysis?.system_tree.map((node) => (
+                          <TreeRow key={node.id} node={node} depth={0} />
+                        ))}
                       </div>
                     </ScrollArea>
                  </CardContent>
                </Card>
             </TabsContent>
 
-            <TabsContent value="medios" className="mt-0">
-               <div className="grid grid-cols-2 gap-4">
-                 {Object.entries(project.analysis.medios).map(([key, val]) => (
-                   <div key={key} className="tech-panel h-full group hover:border-accent transition-all">
-                      <div className="tech-header bg-navy text-white border-none py-1 h-8">
-                        <span className="tech-title text-white">{key}</span>
-                        <Activity size={12} className="text-accent opacity-50" />
+            <TabsContent value="medios" className="mt-0 h-full">
+               <div className="grid grid-cols-2 gap-6">
+                 {/* Investment Consultant Card - Proactive UX */}
+                 {isEstimationMode && project.analysis?.budget_validation.estimated_investment && (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     className="col-span-2 tech-panel bg-navy text-white p-6 mb-2 border-accent/40 relative overflow-hidden"
+                   >
+                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                     <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="space-y-2">
+                           <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[9px] border-accent text-accent uppercase font-black tracking-widest px-2">Axon-Fin Consulting</Badge>
+                              <span className="text-[10px] font-mono text-white/60">ESTIMACIÓN PARAMÉTRICA v3.6</span>
+                           </div>
+                           <h3 className="text-2xl font-black uppercase tracking-tight">Inversión Sugerida: <span className="text-accent">${project.analysis.budget_validation.estimated_investment.min.toLocaleString()} - ${project.analysis.budget_validation.estimated_investment.max.toLocaleString()} MXN</span></h3>
+                           <p className="text-[11px] text-white/70 max-w-2xl italic leading-loose">
+                              Cálculo basado en <b>{project.analysis.budget_validation.total_m2}m²</b> proyectados y requerimientos técnicos detectados. Grado de confianza: <b>{project.analysis.budget_validation.estimated_investment.confidence}</b>.
+                           </p>
+                        </div>
+                        <div className="flex flex-col items-center gap-3 bg-white/5 p-4 border border-white/10 backdrop-blur-md">
+                           <div className="text-center">
+                              <div className="text-[9px] font-black uppercase text-accent mb-1 tracking-widest">Promedio Sugerido</div>
+                              <div className="text-xl font-mono">${project.analysis.budget_validation.estimated_investment.avg_per_m2.toLocaleString()} <span className="text-[10px] opacity-40">/m²</span></div>
+                           </div>
+                           <div className="flex gap-2">
+                             {['Interés Social', 'Medio', 'Lujo'].map(level => (
+                               <button
+                                 key={level}
+                                 onClick={() => onReAnalyze(project.id, `AJUSTAR ESTIMACIÓN: Cambiar nivel de acabados a "${level}". Recalcular inversión paramétrica.`)}
+                                 className="text-[8px] font-black uppercase px-2 py-1 border border-white/20 hover:border-accent hover:bg-accent/20 transition-all"
+                               >
+                                 {level}
+                               </button>
+                             ))}
+                           </div>
+                           <Button 
+                             onClick={handleFixBudget}
+                             disabled={isAnalyzing}
+                             className="bg-accent hover:bg-[#007070] text-white rounded-none h-10 w-full font-black text-[9px] uppercase tracking-[0.2em] shadow-xl"
+                           >
+                             {isAnalyzing ? "PROCESANDO..." : "FIJAR COMO PRESUPUESTO BASE"}
+                           </Button>
+                        </div>
+                     </div>
+                   </motion.div>
+                 )}
+
+                 {Object.entries(project.analysis.medios).map(([key, detail]) => (
+                   <div key={key} className="tech-panel h-full group hover:border-accent transition-all relative">
+                      <div className="tech-header bg-navy text-white border-none py-1 h-10 px-4">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest">{key}</span>
+                          <span className="text-[8px] font-mono text-accent uppercase">{detail.importance}</span>
+                        </div>
+                        <Activity size={14} className="text-accent opacity-50" />
                       </div>
-                      <ScrollArea className="h-[180px] p-5">
-                         <div className="relative">
-                           <div className="absolute -left-3 top-0 w-[1px] h-full bg-accent/20" />
-                           <p className="text-xs text-navy leading-loose serif-italic opacity-90">{val}</p>
-                         </div>
-                      </ScrollArea>
+                      <div className="p-5 space-y-4">
+                        <div className="relative">
+                          <div className="absolute -left-3 top-0 w-[1px] h-full bg-accent/20" />
+                          <p className="text-xs text-navy leading-loose serif-italic opacity-90">{detail.description}</p>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-line/50">
+                          <div className="flex items-center gap-2 mb-2">
+                             <div className="w-1 h-1 bg-accent" />
+                             <span className="text-[9px] font-black text-muted uppercase tracking-tighter">Requerimiento General (RG)</span>
+                          </div>
+                          <div className="bg-bg text-navy px-3 py-2 border-l-2 border-accent font-mono text-[10px] leading-snug">
+                             {detail.rg}
+                          </div>
+                        </div>
+                      </div>
                    </div>
                  ))}
                </div>
             </TabsContent>
-            
-            <TabsContent value="files" className="mt-0">
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 {project.files.map((f, i) => (
-                   <div key={i} className="p-4 border border-line bg-surface flex items-center gap-4 group transition-all hover:border-accent">
-                      <div className="w-12 h-12 border border-line flex items-center justify-center text-muted group-hover:text-accent group-hover:bg-accent/5">
-                        <Upload size={18} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[11px] font-bold text-navy truncate uppercase">{f.name}</div>
-                        <div className="text-[9px] text-muted font-mono">{f.type}</div>
-                      </div>
-                      <ExternalLink size={14} className="text-muted opacity-0 group-hover:opacity-100 cursor-pointer" />
-                   </div>
-                 ))}
-                 {project.files.length === 0 && (
-                   <div className="col-span-2 p-12 text-center border-2 border-dashed border-line">
-                      <p className="text-[10px] text-muted uppercase font-bold tracking-widest">Sin archivos adjuntos</p>
-                   </div>
-                 )}
+
+            <TabsContent value="arquitectura" className="mt-0 h-full">
+               <div className="flex gap-6 h-full min-h-[600px]">
+                  <div className="flex-[3] flex flex-col gap-4">
+                     <div className="flex items-center justify-between">
+                        <div className="flex flex-col">
+                           <span className="text-[12px] font-black text-navy uppercase tracking-widest">Plano Preliminar MORPHO</span>
+                           <span className="text-[10px] font-mono text-muted uppercase">Sintetizador Espacial v3.7</span>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="xs"
+                          className="h-8 rounded-none border-line text-[9px] font-black uppercase tracking-widest gap-2 bg-white"
+                          onClick={() => {
+                            const svg = document.querySelector('.arquitectura svg');
+                            if (svg) {
+                              const svgData = new XMLSerializer().serializeToString(svg);
+                              const svgBlob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
+                              const url = URL.createObjectURL(svgBlob);
+                              const link = document.createElement("a");
+                              link.href = url;
+                              link.download = `arkhe-morpho-${project.id}.svg`;
+                              link.click();
+                            }
+                          }}
+                        >
+                          <Maximize2 size={12} />
+                          Exportar SVG
+                        </Button>
+                     </div>
+                     
+                     <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura h-[60vh]">
+                        {project.analysis.spatial_layout ? (
+                          <ZoningMap 
+                             layout={project.analysis.spatial_layout}
+                             interactions={project.analysis.interaction_matrix}
+                             onSelectBlock={setSelectedBlockId}
+                             selectedId={selectedBlockId}
+                             isEstimationMode={isEstimationMode}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center">
+                             <div className="w-16 h-16 border border-line flex items-center justify-center text-muted mb-6">
+                                <Box size={24} className="animate-pulse" />
+                             </div>
+                             <h4 className="text-sm font-black text-navy uppercase tracking-widest">Generando Topología...</h4>
+                             <p className="text-[10px] text-muted max-w-[200px] mt-2 uppercase leading-relaxed font-mono">
+                                El motor MORPHO está sintetizando las relaciones de proximidad en coordenadas geométricas.
+                             </p>
+                          </div>
+                        )}
+                     </div>
+                  </div>
+
+                  <div className="flex-1 flex flex-col gap-4 min-w-[320px]">
+                     <div className="tech-panel flex-1 h-full">
+                        <div className="tech-header bg-navy text-white border-none py-1 h-10 px-4">
+                           <span className="tech-title text-white">Cédula de Requerimientos</span>
+                        </div>
+                        {selectedBlock && blockDetails ? (
+                          <ScrollArea className="flex-1">
+                            <div className="p-6 space-y-6">
+                               <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                     <Badge className="bg-accent text-white rounded-none text-[8px]">{blockDetails.code}</Badge>
+                                     <span className="text-[10px] font-mono text-muted">{blockDetails.type}</span>
+                                  </div>
+                                  <h3 className="text-lg font-black text-navy uppercase tracking-tighter">{blockDetails.name}</h3>
+                               </div>
+
+                               <div className="space-y-4">
+                                  <RequirementItem label="R1. Funcional" value={blockDetails.requirements?.r1_funcional} />
+                                  <RequirementItem label="R2. Espacial" value={blockDetails.requirements?.r2_espacial} />
+                                  <RequirementItem label="R3. Técnico" value={blockDetails.requirements?.r3_tecnico} />
+                                  <RequirementItem label="R4. Psicológico" value={blockDetails.requirements?.r4_psicologico} />
+                                  <RequirementItem label="R5. Flexibilidad" value={blockDetails.requirements?.r5_flexibilidad} />
+                               </div>
+
+                               <div className="pt-6 border-t border-line">
+                                  <div className="flex justify-between items-center text-[10px] font-mono mb-4 text-muted">
+                                     <span>Área Proyectada</span>
+                                     <span className="font-bold text-navy">{blockDetails.calculated_m2} m²</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                     <div className="p-3 bg-bg border border-line text-center">
+                                       <div className="text-[8px] font-black text-muted uppercase mb-1">Zona</div>
+                                       <div className="text-[10px] font-bold text-navy uppercase">{selectedBlock.zone}</div>
+                                     </div>
+                                     <div className="p-3 bg-bg border border-line text-center">
+                                       <div className="text-[8px] font-black text-muted uppercase mb-1">Status</div>
+                                       <div className="text-[10px] font-bold text-emerald-500 uppercase">Validado</div>
+                                     </div>
+                                  </div>
+                               </div>
+                            </div>
+                          </ScrollArea>
+                        ) : (
+                          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-bg/50 h-[300px]">
+                             <Info size={24} className="text-muted mb-4 opacity-20" />
+                             <p className="text-[9px] text-muted font-bold uppercase tracking-[0.2em] leading-relaxed">
+                                Seleccione un bloque de zonificación para auditar sus requerimientos particulares.
+                             </p>
+                          </div>
+                        )}
+                     </div>
+                  </div>
                </div>
             </TabsContent>
           </ScrollArea>
         </Tabs>
+
+        {/* SIDEBAR: REFERENCIA TÉCNICA (Drawer Mode) */}
+        <AnimatePresence>
+          {isReferenceOpen && (
+            <motion.aside 
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              className="absolute top-0 right-0 h-full w-[320px] bg-white border-l border-line z-[60] shadow-[-20px_0_40px_rgba(0,0,0,0.1)] flex flex-col"
+            >
+              <div className="p-6 border-b border-line flex items-center justify-between bg-surface shrink-0">
+                <div className="flex items-center gap-3">
+                  <FolderOpen size={18} className="text-accent" />
+                  <span className="text-[12px] font-black text-navy uppercase tracking-widest">Referencia Técnica</span>
+                </div>
+                <button onClick={() => setIsReferenceOpen(false)} className="text-muted hover:text-navy">
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+              
+              <ScrollArea className="flex-1">
+                <div className="p-6 space-y-6">
+                   <div className="space-y-4">
+                     <p className="text-[10px] font-mono text-muted uppercase leading-relaxed">Documentos de ingesta vinculados al expediente actual:</p>
+                     
+                     <div className="space-y-2">
+                        {project.files.map((f, i) => (
+                          <div key={i} className="p-4 border border-line bg-bg flex items-center gap-4 group transition-all hover:border-accent cursor-pointer">
+                            <div className="w-10 h-10 border border-line flex items-center justify-center text-muted group-hover:text-accent group-hover:bg-accent/5 shrink-0">
+                              <FileText size={16} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] font-bold text-navy truncate uppercase">{f.name}</div>
+                              <div className="text-[8px] text-muted font-mono">{f.type}</div>
+                            </div>
+                            <ExternalLink size={12} className="text-muted opacity-0 group-hover:opacity-100" />
+                          </div>
+                        ))}
+                        {project.files.length === 0 && (
+                          <div className="p-8 text-center border-2 border-dashed border-line">
+                            <p className="text-[9px] text-muted uppercase font-bold tracking-widest leading-relaxed">No hay documentos de referencia cargados.</p>
+                          </div>
+                        )}
+                     </div>
+                   </div>
+                   
+                   <div className="pt-6 border-t border-line">
+                      <Button className="w-full h-10 rounded-none bg-navy text-white text-[9px] font-black uppercase tracking-widest gap-2">
+                        <Upload size={14} />
+                        Añadir Documentación
+                      </Button>
+                   </div>
+                </div>
+              </ScrollArea>
+              
+              <div className="p-4 bg-muted/5 border-t border-line mt-auto">
+                 <div className="flex items-center gap-2 text-[9px] font-mono text-muted uppercase">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                    Vault Status: Restricted Access
+                 </div>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Panel 2: Validation (Right) */}
       <div className="flex-[2] flex flex-col gap-6 overflow-hidden">
-        <div className="flex-1 tech-panel min-h-0">
+        <div className="flex-1 tech-panel min-h-0 relative">
           <div className="tech-header">
             <span className="tech-title">02. Validación Morpho</span>
             <div className="flex items-center gap-2">
                <span className="text-[9px] font-mono text-muted uppercase">Interaction Matrix</span>
-               <div className="w-2 h-2 rounded-full bg-emerald-500" />
+               <div className={cn(
+                 "w-2 h-2 rounded-full",
+                 project.analysis?.budget_validation.alert ? "bg-destructive animate-pulse" : "bg-emerald-500"
+               )} />
             </div>
           </div>
+          
+          {project.analysis?.budget_validation.alert && (
+            <div className="absolute inset-0 z-40 bg-navy/60 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center text-white">
+              <div className="w-16 h-16 border-4 border-destructive rounded-none flex items-center justify-center mb-6">
+                <AlertTriangle size={32} className="text-destructive" />
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tighter mb-2">Acceso Bloqueado // Morpho Gate</h3>
+              <p className="text-xs opacity-80 mb-8 max-w-xs uppercase font-bold tracking-widest leading-relaxed">
+                Desviación presupuestal crítica detectada ({project.analysis.budget_validation.deviation}%). La gobernanza recursiva impide la optimización formal hasta ajustar los objetivos base.
+              </p>
+              
+              {!adjusting ? (
+                <Button 
+                  className="bg-accent hover:bg-[#007070] text-white rounded-none h-11 px-6 font-black tracking-widest text-[10px] uppercase shadow-2xl"
+                  onClick={() => setAdjusting(true)}
+                >
+                  AJUSTAR OBJETIVOS ESTRATÉGICOS
+                </Button>
+              ) : (
+                <div className="w-full space-y-4">
+                  <textarea 
+                    className="w-full bg-navy/40 border border-white/20 p-4 text-xs font-mono text-white placeholder:text-white/20 h-24 rounded-none outline-none focus:border-accent transition-all"
+                    placeholder="Instrucciones de ajuste (ej: reducir área de dormitorios, buscar materiales económicos)..."
+                    value={adjText}
+                    onChange={(e) => setAdjText(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1 bg-white text-navy font-black text-[10px] uppercase tracking-widest h-10 rounded-none hover:bg-slate-200"
+                      onClick={() => setAdjusting(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      disabled={isAnalyzing || !adjText}
+                      className="flex-[2] bg-accent text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-none hover:bg-[#007070]"
+                      onClick={async () => {
+                        await onReAnalyze(project.id, adjText);
+                        setAdjusting(false);
+                        setAdjText('');
+                      }}
+                    >
+                      {isAnalyzing ? "RE-ANALIZANDO..." : "RE-INYECTAR CONTEXTO"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-6">
@@ -947,7 +1328,26 @@ function ProjectView({ project }: { project: Project; key?: any }) {
                 </div>
               </div>
 
-              {/* Recursivity Alerta */}
+              {/* Recursivity Alerta / Estimation Insights */}
+              {project.analysis.budget_validation.estimated_investment && (
+                <div className="p-4 border border-navy/20 bg-navy/5 space-y-3">
+                   <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-navy uppercase tracking-widest">Proyección de Inversión</span>
+                      <Badge className="bg-navy text-white text-[8px] rounded-none">Paramétrico</Badge>
+                   </div>
+                   <div className="flex items-end justify-between border-b border-navy/10 pb-2">
+                      <div className="flex flex-col">
+                         <span className="text-[9px] text-muted font-mono uppercase">Promedio Sugerido</span>
+                         <span className="text-lg font-mono font-bold text-navy">${project.analysis.budget_validation.estimated_investment.avg_per_m2.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                         <span className="text-[9px] text-muted font-mono uppercase">Rango (Min/Max)</span>
+                         <span className="text-[11px] font-mono text-navy">${(project.analysis.budget_validation.estimated_investment.min/1000000).toFixed(1)}M - ${(project.analysis.budget_validation.estimated_investment.max/1000000).toFixed(1)}M</span>
+                      </div>
+                   </div>
+                </div>
+              )}
+
               {project.analysis.budget_validation.alert && (
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
@@ -1013,6 +1413,93 @@ function ProjectView({ project }: { project: Project; key?: any }) {
   );
 }
 
+function RequirementItem({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="space-y-1.5">
+       <span className="text-[9px] font-black text-muted uppercase tracking-widest">{label}</span>
+       <div className="p-3 bg-bg border-l-2 border-accent font-serif italic text-[11px] leading-relaxed text-navy bg-white shadow-sm">
+          {value || 'No definido'}
+       </div>
+    </div>
+  );
+}
+
+function TreeRow({ node, depth }: { node: SystemNode; depth: number; key?: any }) {
+  const [isOpen, setIsOpen] = useState(depth < 2); // Auto-open first few levels
+
+  return (
+    <div className="flex flex-col border-l border-line/30 ml-4 group/row">
+      <div 
+        className={cn(
+          "flex items-center py-2 px-4 hover:bg-navy/[0.02] cursor-pointer group transition-colors relative",
+          isOpen && "bg-navy/[0.01]"
+        )}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="w-[104px] shrink-0 font-mono text-[9px] text-accent font-bold flex items-center gap-2">
+          {node.code}
+          {node.children && node.children.length > 0 && (
+            <ChevronDown size={10} className={cn("transition-transform duration-300", !isOpen && "-rotate-90")} />
+          )}
+        </div>
+        
+        <div className="flex-1 flex items-center gap-3">
+          <Badge 
+            variant="outline" 
+            className={cn(
+              "text-[8px] px-1 py-0 rounded-none font-black uppercase tracking-tighter shrink-0",
+              node.type === 'Sistema' ? "bg-navy text-white border-navy" : 
+              node.type === 'Subsistema' ? "text-navy border-navy" :
+              "text-muted border-line"
+            )}
+          >
+            {node.type}
+          </Badge>
+          <span className={cn(
+            "text-[11px] uppercase tracking-tight",
+            node.type === 'Sistema' ? "font-black text-navy" : "font-bold text-navy/80"
+          )}>
+            {node.name}
+          </span>
+        </div>
+
+        <div className="w-[100px] text-right font-mono font-bold text-navy text-[10px] px-4">
+          {node.calculated_m2 ? `${node.calculated_m2}m²` : '--'}
+        </div>
+
+        <div className="w-[160px] flex gap-1 px-4 items-center h-full">
+          {node.type === 'Local' && node.requirements ? (
+            <>
+              <RequirementBadge r="F" text={node.requirements.r1_funcional} />
+              <RequirementBadge r="E" text={node.requirements.r2_espacial} />
+              <RequirementBadge r="T" text={node.requirements.r3_tecnico} />
+              <RequirementBadge r="P" text={node.requirements.r4_psicologico} />
+              <RequirementBadge r="D" text={node.requirements.r5_flexibilidad} />
+            </>
+          ) : (
+             <div className="h-4 w-[1px] bg-line/20 ml-2" />
+          )}
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && node.children && node.children.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            {node.children.map((child) => (
+              <TreeRow key={child.id} node={child} depth={depth + 1} />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function MetricBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="p-4 border border-line bg-surface flex flex-col gap-1 transition-all hover:border-accent group">
@@ -1074,7 +1561,7 @@ function TabTrigger({ value, label, sub }: { value: string; label: string; sub: 
   );
 }
 
-function EmptyState({ onStart }: { onStart: () => void }) {
+function EmptyState({ onStart, isAnalyzing }: { onStart: () => void; isAnalyzing?: boolean }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-line bg-surface/30">
       <motion.div 
@@ -1082,10 +1569,9 @@ function EmptyState({ onStart }: { onStart: () => void }) {
         animate={{ scale: 1, opacity: 1 }}
         className="flex flex-col items-center max-w-sm text-center"
       >
-        <div className="w-20 h-20 border border-line flex items-center justify-center text-line mb-6 relative">
-           <Layers size={32} />
-           <div className="absolute top-0 right-0 w-2 h-2 bg-accent/20" />
-           <div className="absolute bottom-0 left-0 w-2 h-2 bg-navy/20" />
+        <div className="mb-10 relative">
+           <ArkheLogo variant="icon" size={80} isAnalyzing={isAnalyzing} />
+           <div className="absolute -inset-4 bg-accent/5 rounded-full blur-2xl animate-pulse -z-10" />
         </div>
         <h3 className="text-xl font-serif italic text-navy mb-2">Ingesta Pendiente</h3>
         <p className="text-xs text-muted mb-8 uppercase tracking-widest font-medium">
