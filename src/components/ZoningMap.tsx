@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, ZoomIn, ZoomOut, MousePointer2, Info, Compass } from 'lucide-react';
+import { Maximize2, Minimize2, ZoomIn, ZoomOut, MousePointer2, Info, Compass, Lock, Unlock, RefreshCw, AlertTriangle } from 'lucide-react';
 import { SpatialBlock, InteractionRelation } from '../types';
+import { useZoning } from '../hooks/useZoning';
 import { cn } from '../lib/utils';
 
 interface ZoningMapProps {
@@ -10,24 +11,30 @@ interface ZoningMapProps {
   onSelectBlock: (id: string) => void;
   selectedId?: string;
   isEstimationMode?: boolean;
+  boundingBox?: { width: number; height: number };
 }
 
 export const ZoningMap: React.FC<ZoningMapProps> = ({ 
-  layout, 
+  layout: initialLayout, 
   interactions, 
   onSelectBlock, 
   selectedId,
-  isEstimationMode = false
+  isEstimationMode = false,
+  boundingBox = { width: 100, height: 100 }
 }) => {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+
+  const { layout, setBlockPosition, unlockBlock, coherenceAlerts } = useZoning(initialLayout, interactions, boundingBox);
 
   const colors = {
     Privado: '#002F56', // Azul RAUVIA
     Social: '#00E0FF',  // Cian Eléctrico
     Servicio: '#6B7280', // Gris Técnico
+    'Conexión': '#F59E0B' // Ámbar de Enlace
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -42,10 +49,28 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
         x: prev.x + e.movementX,
         y: prev.y + e.movementY
       }));
+    } else if (draggedId && canvasRef.current) {
+       const rect = canvasRef.current.getBoundingClientRect();
+       const mouseX = (e.clientX - rect.left - offset.x) / zoom;
+       const mouseY = (e.clientY - rect.top - offset.y) / zoom;
+       
+       // Coordinate normalization back to 0-100 based on viewport
+       // However, the SVG is viewBox 0 0 100 100, so we need to map mouse correctly
+       const svgWidth = rect.width;
+       const svgHeight = rect.height;
+       const normX = (mouseX / svgWidth) * 100;
+       const normY = (mouseY / svgHeight) * 100;
+
+       setBlockPosition(draggedId, normX, normY);
     }
   };
 
-  const handleMouseUp = () => setIsPanning(false);
+  const handleMouseUp = () => {
+    setIsPanning(false);
+    setDraggedId(null);
+  };
+
+  const hasAlerts = coherenceAlerts.length > 0;
 
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
@@ -108,12 +133,36 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
           <ZoomOut size={18} />
         </button>
         <button 
-          onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}
+          onClick={() => { 
+             setZoom(1); 
+             setOffset({ x: 0, y: 0 }); 
+             layout.forEach(b => unlockBlock(b.id)); 
+          }}
           className="w-10 h-10 bg-white border border-line flex items-center justify-center text-navy hover:bg-accent hover:text-white transition-all shadow-lg"
+          title="Reset Physics & Unlock All"
         >
-          <Maximize2 size={18} />
+          <RefreshCw size={18} />
         </button>
       </div>
+
+      {/* Coherence Alerts Overlay */}
+      <AnimatePresence>
+        {hasAlerts && (
+           <motion.div 
+             initial={{ opacity: 0, y: 20 }}
+             animate={{ opacity: 1, y: 0 }}
+             exit={{ opacity: 0, y: 20 }}
+             className="absolute top-20 left-1/2 -translate-x-1/2 z-20 flex flex-col gap-2 pointer-events-none"
+           >
+              {coherenceAlerts.map((alert, i) => (
+                <div key={i} className="bg-destructive text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 shadow-2xl flex items-center gap-3 border border-white/20">
+                   <AlertTriangle size={14} />
+                   {alert}
+                </div>
+              ))}
+           </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Canvas Viewport */}
       <motion.svg 
@@ -147,21 +196,24 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
         {layout.map((block) => (
           <g 
             key={block.id}
-            onClick={(e) => {
+            onMouseDown={(e) => {
               e.stopPropagation();
               onSelectBlock(block.id);
+              if (e.button === 0 && !e.altKey) {
+                 setDraggedId(block.id);
+              }
             }}
             className="cursor-pointer group"
           >
             <motion.rect 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+              layout
+              transition={{ type: "spring", stiffness: 100, damping: 20 }}
               x={block.x} y={block.y}
               width={block.w} height={block.h}
-              fill={colors[block.zone]}
+              fill={colors[block.zone as keyof typeof colors]}
               fillOpacity={selectedId === block.id ? 0.9 : 0.6}
-              stroke={selectedId === block.id ? "#00E0FF" : "transparent"}
-              strokeWidth="0.8"
+              stroke={selectedId === block.id ? "#00E0FF" : (block.isLocked ? "white" : "transparent")}
+              strokeWidth={block.isLocked ? "0.3" : "0.8"}
               className="transition-all duration-300"
             />
             
@@ -179,6 +231,12 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
             >
               {block.name}
             </text>
+
+            {block.isLocked && (
+               <foreignObject x={block.x + block.w - 4} y={block.y + 1} width="4" height="4">
+                  <Lock className="text-white opacity-50" size={3} />
+               </foreignObject>
+            )}
 
             <text 
               x={block.x + block.w/2} 

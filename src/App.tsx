@@ -641,6 +641,15 @@ function ProjectView({
 
   const isEstimationMode = !project.budget_per_m2 || project.budget_per_m2 === 0;
 
+  const boundingBox = (() => {
+    const fisico = project.analysis?.medios.Físico?.description || "";
+    const match = fisico.match(/(\d+)\s*x\s*(\d+)/i);
+    if (match) {
+      return { width: parseInt(match[1]), height: parseInt(match[2]) };
+    }
+    return { width: 100, height: 100 };
+  })();
+
   const handleFixBudget = async () => {
     if (!project.analysis?.budget_validation.estimated_investment) return;
     const avg = project.analysis.budget_validation.estimated_investment.avg_per_m2;
@@ -1081,7 +1090,7 @@ function ProjectView({
                         </Button>
                      </div>
                      
-                     <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura h-[60vh]">
+                     <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura h-[60vh] relative">
                         {project.analysis.spatial_layout ? (
                           <ZoningMap 
                              layout={project.analysis.spatial_layout}
@@ -1089,6 +1098,7 @@ function ProjectView({
                              onSelectBlock={setSelectedBlockId}
                              selectedId={selectedBlockId}
                              isEstimationMode={isEstimationMode}
+                             boundingBox={boundingBox}
                           />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center">
@@ -1101,6 +1111,16 @@ function ProjectView({
                              </p>
                           </div>
                         )}
+                        
+                        {/* Engine HUD */}
+                        <div className="absolute top-4 left-4 z-20 space-y-2 pointer-events-none">
+                           <div className="bg-white/80 backdrop-blur-md border border-line p-2 shadow-sm">
+                              <div className="flex items-center gap-2 text-[9px] font-black uppercase text-navy">
+                                 <Activity size={12} className="text-accent" />
+                                 Live Physics Engine v2.6
+                              </div>
+                           </div>
+                        </div>
                      </div>
                   </div>
 

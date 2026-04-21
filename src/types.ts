@@ -6,6 +6,14 @@ export interface Sociogram {
   objetivo: string;
 }
 
+export interface LayoutData {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  isLocked?: boolean;
+}
+
 export interface SystemNode {
   id: string;
   code: string;       // E.g., "D1.1.2"
@@ -21,6 +29,10 @@ export interface SystemNode {
     r5_flexibilidad: string;
   };
   children?: SystemNode[]; // Support for real tree structure
+  layout_hints?: {
+    anchor: 'north' | 'south' | 'east' | 'west' | 'center';
+    priority: number; // 0.0 - 1.0 logic
+  };
 }
 
 export interface InteractionRelation {
@@ -41,11 +53,12 @@ export interface MediumDetail {
 export interface SpatialBlock {
   id: string;
   name: string;
-  zone: 'Privado' | 'Social' | 'Servicio';
+  zone: 'Privado' | 'Social' | 'Servicio' | 'Conexión';
   x: number; // 0-100 normalization
   y: number; // 0-100 normalization
   w: number; 
   h: number;
+  isLocked?: boolean;
 }
 
 export interface SpektrResult {
