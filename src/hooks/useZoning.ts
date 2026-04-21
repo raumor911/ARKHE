@@ -36,9 +36,11 @@ export const useZoning = (
           const b1 = next[i];
           const b2 = next[j];
           
-          // Check for interaction
+          // Check for interaction using IDs (Primary Linkage)
           const interaction = interactions.find(rel => 
-            (rel.from === b1.name && rel.to === b2.name) ||
+            (rel.from === b1.id && rel.to === b2.id) ||
+            (rel.from === b2.id && rel.to === b1.id) ||
+            (rel.from === b1.name && rel.to === b2.name) || // Fallback for transition
             (rel.from === b2.name && rel.to === b1.name)
           );
 
@@ -133,8 +135,8 @@ export const useZoning = (
      const alerts: string[] = [];
      interactions.forEach(rel => {
         if (rel.clase === 'A') {
-           const b1 = layout.find(b => b.name === rel.from);
-           const b2 = layout.find(b => b.name === rel.to);
+           const b1 = layout.find(b => b.id === rel.from || b.name === rel.from);
+           const b2 = layout.find(b => b.id === rel.to || b.name === rel.to);
            if (b1 && b2) {
               const dx = (b2.x + b2.w/2) - (b1.x + b1.w/2);
               const dy = (b2.y + b2.h/2) - (b1.y + b1.h/2);

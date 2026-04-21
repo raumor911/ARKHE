@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { 
   Plus, 
@@ -46,6 +46,7 @@ import { storageService } from './lib/storage';
 import { Project, SpektrResult, SystemNode, SpatialBlock } from './types';
 import { ArkheLogo } from './components/branding/Logo';
 import { ZoningMap } from './components/ZoningMap';
+import { MutherGrid } from './components/MutherGrid';
 import { cn } from './lib/utils';
 import { 
   Dialog, 
@@ -625,13 +626,50 @@ function ProjectView({
   const [isReferenceOpen, setIsReferenceOpen] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | undefined>();
 
-  const selectedBlock = project.analysis?.spatial_layout?.find(b => b.id === selectedBlockId);
+  // SÍNTESIS INTEGRAL: Fallback para spatial_layout si la IA falla
+  const processedLayout = useMemo(() => {
+    if (!project.analysis) return [];
+    if (project.analysis.spatial_layout && project.analysis.spatial_layout.length > 0) {
+      return project.analysis.spatial_layout;
+    }
+
+    // Generador de Topología Predeterminado (Frontend-side synthesis)
+    const flatLocals: SystemNode[] = [];
+    const extract = (nodes: SystemNode[]) => {
+      nodes.forEach(n => {
+        if (n.type === 'Local') flatLocals.push(n);
+        if (n.children) extract(n.children);
+      });
+    };
+    extract(project.analysis.system_tree);
+
+    return flatLocals.map((node, i) => {
+      const area = node.calculated_m2 || 10;
+      const size = Math.sqrt(area);
+      return {
+        id: node.id,
+        name: node.name,
+        zone: (node.name.toLowerCase().includes('baño') || node.name.toLowerCase().includes('dormitorio')) ? 'Privado' : 
+              (node.name.toLowerCase().includes('cocina') || node.name.toLowerCase().includes('lavado')) ? 'Servicio' : 'Social',
+        w: size,
+        h: size,
+        x: 40 + (Math.random() * 20),
+        y: 40 + (Math.random() * 20)
+      } as SpatialBlock;
+    });
+  }, [project.analysis]);
+
+  const selectedBlock = processedLayout.find(b => b.id === selectedBlockId);
+  
   const blockDetails = (() => {
     if (!selectedBlock || !project.analysis) return null;
     let found: SystemNode | null = null;
     const search = (nodes: SystemNode[]) => {
       for (const n of nodes) {
-        if (n.name === selectedBlock.name) { found = n; break; }
+        // Universal Link: Prioridad ID, Fallback Name
+        if (n.id === selectedBlock.id || n.name === selectedBlock.name) { 
+          found = n; break; 
+        }
         if (n.children) search(n.children);
       }
     };
@@ -750,7 +788,8 @@ function ProjectView({
           <div className="px-4 border-b border-line shrink-0">
             <TabsList className="h-12 bg-transparent w-full justify-start gap-8">
               <TabTrigger value="overview" label="D0. Sociograma" sub="Causa-Efecto" />
-              <TabTrigger value="sintesis" label="D1. Síntesis" sub="Árbol Técnico" />
+              <TabTrigger value="sintesis" label="D1.1 Árbol" sub="Jerarquía" />
+              <TabTrigger value="matriz" label="D1.2 Matriz" sub="Muther Grid" />
               <TabTrigger value="medios" label="D2. Medios" sub="Diagnóstico" />
               <TabTrigger value="arquitectura" label="D3. Arquitectura" sub="Zonificación" />
               {isEstimationMode && (
@@ -981,6 +1020,37 @@ function ProjectView({
                </Card>
             </TabsContent>
 
+            <TabsContent value="matriz" className="mt-0 h-full flex flex-col overflow-hidden">
+               <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                  <div className="flex items-center justify-between">
+                     <div className="flex flex-col text-navy">
+                       <span className="text-[12px] font-black uppercase tracking-widest">D1.2 Matriz de Interacción de Muther</span>
+                       <span className="text-[10px] font-mono text-muted uppercase">Análisis de Adyacencias Técnico-Funcionales</span>
+                     </div>
+                     <div className="flex items-center gap-4 bg-bg p-2 border border-line">
+                        {['A', 'E', 'I', 'O', 'U', 'X'].map(c => (
+                          <div key={c} className="flex items-center gap-1.5 px-1">
+                             <div className={cn("w-3 h-3 flex items-center justify-center text-[7px] font-black border border-navy/10", 
+                               c === 'A' ? 'bg-emerald-500 text-white' : 
+                               c === 'X' ? 'bg-destructive text-white' : 'bg-slate-50 text-slate-400'
+                             )}>{c}</div>
+                             <span className="text-[8px] font-mono text-muted uppercase tracking-tighter">{c}</span>
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+                  <ScrollArea className="flex-1 border border-line bg-surface shadow-inner">
+                     <MutherGrid nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
+                  </ScrollArea>
+                  <div className="bg-amber/5 border-l-4 border-amber p-4 mt-2">
+                     <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wider leading-relaxed">
+                        ANÁLISIS DE MASA: Las relaciones de clase "A" y "E" activan vectores de atracción en el motor MORPHO. 
+                        Las relaciones "X" disparan fuerzas de repulsión reactiva.
+                     </p>
+                  </div>
+               </div>
+            </TabsContent>
+
             <TabsContent value="medios" className="mt-0 h-full">
                <div className="grid grid-cols-2 gap-6">
                  {/* Investment Consultant Card - Proactive UX */}
@@ -1091,33 +1161,21 @@ function ProjectView({
                      </div>
                      
                      <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura h-[60vh] relative">
-                        {project.analysis.spatial_layout ? (
-                          <ZoningMap 
-                             layout={project.analysis.spatial_layout}
-                             interactions={project.analysis.interaction_matrix}
-                             onSelectBlock={setSelectedBlockId}
-                             selectedId={selectedBlockId}
-                             isEstimationMode={isEstimationMode}
-                             boundingBox={boundingBox}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center p-12 text-center">
-                             <div className="w-16 h-16 border border-line flex items-center justify-center text-muted mb-6">
-                                <Box size={24} className="animate-pulse" />
-                             </div>
-                             <h4 className="text-sm font-black text-navy uppercase tracking-widest">Generando Topología...</h4>
-                             <p className="text-[10px] text-muted max-w-[200px] mt-2 uppercase leading-relaxed font-mono">
-                                El motor MORPHO está sintetizando las relaciones de proximidad en coordenadas geométricas.
-                             </p>
-                          </div>
-                        )}
+                        <ZoningMap 
+                           layout={processedLayout}
+                           interactions={project.analysis.interaction_matrix}
+                           onSelectBlock={setSelectedBlockId}
+                           selectedId={selectedBlockId}
+                           isEstimationMode={isEstimationMode}
+                           boundingBox={boundingBox}
+                        />
                         
                         {/* Engine HUD */}
                         <div className="absolute top-4 left-4 z-20 space-y-2 pointer-events-none">
                            <div className="bg-white/80 backdrop-blur-md border border-line p-2 shadow-sm">
                               <div className="flex items-center gap-2 text-[9px] font-black uppercase text-navy">
                                  <Activity size={12} className="text-accent" />
-                                 Live Physics Engine v2.6
+                                 Live Physics Engine v2.7
                               </div>
                            </div>
                         </div>
