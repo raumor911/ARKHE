@@ -822,11 +822,11 @@ function ProjectView({
                   </div>
                  
                  <div className={cn(
-                   "relative border-2 border-line rounded-2xl bg-slate-50 transition-all duration-500 shadow-inner group/socio",
-                   isCanvasFullscreen ? "fixed inset-0 z-[1000] rounded-none h-screen w-screen bg-bg" : "w-full min-h-[70vh] overflow-hidden"
+                   "relative border-2 border-line rounded-2xl bg-slate-50 transition-all duration-500 shadow-inner group/socio overflow-hidden",
+                   isCanvasFullscreen ? "fixed inset-0 z-[1000] rounded-none h-screen w-screen bg-bg" : "w-full h-[600px]"
                  )}>
-                   {/* Fullscreen Toggle Controls */}
-                   <div className="absolute top-4 right-4 flex items-center gap-3 z-30">
+                   {/* Fullscreen Toggle Controls - FIJO EN LA ESQUINA */}
+                   <div className="absolute top-4 right-4 flex items-center gap-3 z-[60]">
                      <button 
                        onClick={() => setIsCanvasFullscreen(!isCanvasFullscreen)}
                        className="p-3 bg-white/90 backdrop-blur-md border border-line shadow-2xl hover:bg-navy hover:text-white transition-all group/expand active:scale-95"
@@ -844,9 +844,9 @@ function ProjectView({
                      SPEKTR_TRACE_ENGINE // {isCanvasFullscreen ? 'FULL_IMMERSION_MODE' : 'Canvas Mode v2.0'}
                    </div>
                    
-                   <ScrollArea className="h-full w-full touch-pan-x touch-pan-y overscroll-none">
+                   <ScrollArea className="h-full w-full cursor-grab active:cursor-grabbing">
                      <div 
-                       className="p-8 md:p-12 flex flex-col items-center relative w-full"
+                       className="p-12 flex flex-col items-center relative w-full min-w-[1000px]"
                        style={{ 
                          backgroundImage: 'radial-gradient(var(--navy) 0.5px, transparent 0.5px)',
                          backgroundSize: '32px 32px',
@@ -864,7 +864,7 @@ function ProjectView({
                           <div className="mt-4 h-1 w-12 bg-accent mx-auto" />
                         </div>
 
-                        <div className="relative flex flex-col items-center gap-4 w-full max-w-5xl">
+                        <div className="relative flex flex-col items-center gap-4 w-full">
                           {/* 01. Entrada Sistémica (Causa) */}
                           <motion.div 
                             initial={{ opacity: 0, y: -20 }}

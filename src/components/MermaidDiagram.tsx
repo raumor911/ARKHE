@@ -16,7 +16,8 @@ mermaid.initialize({
   },
   flowchart: {
     useMaxWidth: true,
-    padding: 20
+    htmlLabels: true,
+    padding: 40
   }
 });
 
@@ -44,7 +45,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code }) => {
   return (
     <div 
       ref={containerRef} 
-      className="w-full flex justify-center overflow-auto bg-white p-6 border border-line rounded-none"
+      className="w-full flex justify-center overflow-auto bg-white p-6 border border-line rounded-none min-h-[500px]"
     />
   );
 };
