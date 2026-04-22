@@ -16,9 +16,10 @@ interface SociogramaDiagramProps {
     objetivo: string;
     efecto: string;
   };
+  status?: 'NORMAL' | 'CRITICAL_ALUCINATION' | 'LOW_EVIDENCE' | 'INCONSISTENCY';
 }
 
-export const SociogramaDiagram: React.FC<SociogramaDiagramProps> = ({ data }) => {
+export const SociogramaDiagram: React.FC<SociogramaDiagramProps> = ({ data, status = 'NORMAL' }) => {
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -60,7 +61,9 @@ export const SociogramaDiagram: React.FC<SociogramaDiagramProps> = ({ data }) =>
 
   return (
     <div className={cn(
-      "relative border-2 border-line rounded-2xl bg-slate-50 transition-all duration-500 shadow-inner group/socio overflow-hidden",
+      "relative border-2 transition-all duration-500 shadow-inner group/socio overflow-hidden",
+      status === 'CRITICAL_ALUCINATION' ? "border-destructive animate-pulse" : 
+      status === 'INCONSISTENCY' ? "border-amber" : "border-line rounded-2xl bg-slate-50",
       isFullscreen ? "fixed inset-0 z-[1000] rounded-none h-screen w-screen bg-bg" : "w-full h-[600px]"
     )}
     onWheel={handleWheel}

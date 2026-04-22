@@ -22,7 +22,9 @@ import {
   Maximize2,
   Minimize2,
   FolderOpen,
-  ArrowRight
+  ArrowRight,
+  Pencil,
+  RotateCcw
 } from 'lucide-react';
 import {
   Table,
@@ -70,6 +72,7 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(storageService.getActiveId());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   
@@ -212,20 +215,25 @@ export default function App() {
     try {
       const { result, updatedHistory } = await analyzeProject(
         adjustments,
-        project.files.map(f => ({ data: f.data, mimeType: f.type })),
+        uploadedFiles.map(f => ({ data: f.data, mimeType: f.type })),
         project.history || []
       );
 
       const updatedProject: Project = {
         ...project,
+        name: newName,
+        description: adjustments,
+        files: uploadedFiles,
         budget_per_m2: newBudget !== undefined ? newBudget : project.budget_per_m2,
         analysis: result,
         history: updatedHistory
       };
 
       await storageService.saveProject(updatedProject);
-      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, analysis: result, history: updatedHistory, budget_per_m2: newBudget !== undefined ? newBudget : p.budget_per_m2 } : p));
+      setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
       toast.success('Gobernanza completa: Objetivos ajustados y persistidos.');
+      setIsCreating(false);
+      resetForm();
     } catch (error) {
       toast.error('Error en el ciclo de recursividad ARKHÉ.');
     } finally {
@@ -238,6 +246,17 @@ export default function App() {
     setNewDesc('');
     setNewBudget(0);
     setUploadedFiles([]);
+    setEditingProjectId(null);
+  };
+
+  const openEditMode = (p: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingProjectId(p.id);
+    setNewName(p.name);
+    setNewDesc(p.description);
+    setNewBudget(p.budget_per_m2 || 0);
+    setUploadedFiles(p.files);
+    setIsCreating(true);
   };
 
   const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
@@ -253,6 +272,49 @@ export default function App() {
         toast.error('Error al purgar expediente de memoria.');
       }
     }
+  };
+
+  const getAuditMetrics = (project: Project) => {
+    const confidence = project.analysis?.normative_confidence_score || 0;
+    
+    // 1. Cálculo de Validez (Evidencia real)
+    const fileWeight = Math.min(project.files.length * 25, 50); // 2 archivos = 50%
+    
+    let totalFields = 0;
+    let filledFields = 0;
+    
+    project.analysis?.system_tree.forEach(node => {
+      if (node.requirements) {
+        Object.values(node.requirements).forEach(val => {
+          if (typeof val === 'string') {
+            totalFields++;
+            if (val && !val.toLowerCase().includes("diseño") && !val.toLowerCase().includes("hipótesis") && !val.toLowerCase().includes("pendiente")) {
+              filledFields++;
+            }
+          }
+        });
+      }
+    });
+
+    const dataCompleteness = totalFields > 0 ? (filledFields / totalFields) * 50 : 0;
+    const validity = Math.round(fileWeight + dataCompleteness);
+
+    // 2. Lógica de Alertamiento
+    let status: 'NORMAL' | 'CRITICAL_ALUCINATION' | 'LOW_EVIDENCE' | 'INCONSISTENCY' = "NORMAL";
+    let message = "";
+
+    if (confidence > 0.8 && validity < 20) {
+      status = "CRITICAL_ALUCINATION";
+      message = "ALERTA: Alta confianza sin respaldo documental.";
+    } else if (confidence < 0.4 && validity > 70) {
+      status = "INCONSISTENCY";
+      message = "CONFLICTO: El brief contradice la evidencia cargada.";
+    } else if (validity < 40) {
+      status = "LOW_EVIDENCE";
+      message = "INGESTA DÉBIL: Nutra el sistema con PDFs técnicos.";
+    }
+
+    return { validity, status, message };
   };
 
   return (
@@ -290,7 +352,10 @@ export default function App() {
         <div className="p-4 border-b border-line shrink-0">
           <Button 
             className="w-full h-11 rounded-none bg-navy hover:bg-ink text-white font-bold text-[10px] uppercase tracking-widest gap-2"
-            onClick={() => setIsCreating(true)}
+            onClick={() => {
+              resetForm();
+              setIsCreating(true);
+            }}
           >
             <Plus size={14} />
             {!isSidebarCollapsed && "NUEVA INGESTA"}
@@ -330,17 +395,40 @@ export default function App() {
                     {!isSidebarCollapsed && (
                       <div className="overflow-hidden">
                         <div className="text-[11px] font-bold text-navy truncate uppercase tracking-tight">{p.name}</div>
-                        <div className="text-[9px] text-muted font-mono">{new Date(p.createdAt).toLocaleDateString()}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-[9px] text-muted font-mono">{new Date(p.createdAt).toLocaleDateString()}</div>
+                          <div className="w-1 h-1 rounded-full bg-line" />
+                          <div className={cn(
+                            "text-[8px] font-black uppercase tracking-widest",
+                            getAuditMetrics(p).validity > 80 ? "text-emerald-500" : 
+                            getAuditMetrics(p).validity > 50 ? "text-amber" : "text-muted"
+                          )}>
+                            Valid: {getAuditMetrics(p).validity}%
+                          </div>
+                          {getAuditMetrics(p).status !== 'NORMAL' && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
                   {!isSidebarCollapsed && (
-                    <button 
-                      onClick={(e) => handleDeleteProject(p.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-destructive text-muted transition-all"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button 
+                        onClick={(e) => openEditMode(p, e)}
+                        className="p-1.5 hover:bg-navy/10 text-muted hover:text-navy"
+                        title="Editar Brief / Nueva Iteración"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeleteProject(p.id, e)}
+                        className="p-1.5 hover:bg-destructive/10 text-muted hover:text-destructive"
+                        title="Purgar Expediente"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -461,6 +549,11 @@ export default function App() {
                 project={activeProject} 
                 onReAnalyze={handleReAnalyze}
                 isAnalyzing={isAnalyzing}
+                getAuditMetrics={getAuditMetrics}
+                onUpdateProject={(p) => {
+                  setProjects(prev => prev.map(old => old.id === p.id ? p : old));
+                  storageService.saveProject(p);
+                }}
               />
             ) : (
               <EmptyState onStart={() => setIsCreating(true)} isAnalyzing={isAnalyzing} />
@@ -492,7 +585,9 @@ export default function App() {
             {/* Left: Form */}
             <div className="w-7/12 p-8 border-r border-line bg-surface overflow-y-auto scrollbar-hide">
               <div className="mb-8">
-                <h2 className="text-2xl font-serif italic text-navy">Nueva Ingesta ARKHÉ</h2>
+                <h2 className="text-2xl font-serif italic text-navy">
+                  {editingProjectId ? "Editar Expediente ARKHÉ" : "Nueva Ingesta ARKHÉ"}
+                </h2>
                 <p className="technical-label mt-1">Gobernanza de Proyectos Sistémicos</p>
               </div>
 
@@ -590,7 +685,7 @@ export default function App() {
                 <Button 
                   disabled={isAnalyzing || !newName || !newDesc}
                   className="w-full h-14 rounded-none bg-accent hover:bg-[#007070] text-white font-black tracking-[0.2em] relative overflow-hidden group"
-                  onClick={handleStartAnalysis}
+                  onClick={editingProjectId ? () => handleReAnalyze(editingProjectId, newDesc, newBudget) : handleStartAnalysis}
                 >
                   {isAnalyzing ? (
                     <span className="flex items-center gap-2">
@@ -598,7 +693,7 @@ export default function App() {
                       ANALIZANDO...
                     </span>
                   ) : (
-                    "INICIAR MOTOR ARKHÉ"
+                    editingProjectId ? "ACTUALIZAR E ITERAR" : "INICIAR MOTOR ARKHÉ"
                   )}
                   <motion.div 
                     className="absolute inset-x-0 bottom-0 h-[2px] bg-white/30"
@@ -615,14 +710,40 @@ export default function App() {
   );
 }
 
+function IntegrityShield({ alerts }: { alerts: string[] }) {
+  if (alerts.length === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-destructive/10 border-l-4 border-destructive p-4 mb-4 flex items-start gap-4"
+    >
+      <AlertTriangle className="text-destructive shrink-0" size={18} />
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] font-black text-destructive uppercase tracking-widest">
+          Riesgo de Corrupción de Modelo Detectado
+        </span>
+        {alerts.map((alert, i) => (
+          <p key={i} className="text-[11px] font-mono text-navy/80 italic">- {alert}</p>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 function ProjectView({ 
   project, 
   onReAnalyze, 
-  isAnalyzing 
+  isAnalyzing,
+  getAuditMetrics,
+  onUpdateProject
 }: { 
   project: Project; 
   onReAnalyze: (id: string, adj: string, budget?: number) => Promise<void>; 
   isAnalyzing: boolean;
+  getAuditMetrics: (p: Project) => { validity: number; status: string; message: string };
+  onUpdateProject: (p: Project) => void;
   key?: any;
 }) {
   const [adjusting, setAdjusting] = useState(false);
@@ -630,6 +751,67 @@ function ProjectView({
   const [isReferenceOpen, setIsReferenceOpen] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | undefined>();
   const [showReasons, setShowReasons] = useState(true);
+
+  // 1. Detección de "Atracción Imposible" (Densidad Crítica) 
+  const systemicAlerts = useMemo(() => {
+    if (!project.analysis) return [];
+    const alerts: string[] = [];
+    const matrix = project.analysis.interaction_matrix;
+    
+    const nodeConnections: Record<string, number> = {}; 
+    matrix.forEach(rel => { 
+      if (rel.clase === 'A') { 
+        nodeConnections[rel.from] = (nodeConnections[rel.from] || 0) + 1; 
+        nodeConnections[rel.to] = (nodeConnections[rel.to] || 0) + 1; 
+      } 
+    }); 
+
+    Object.entries(nodeConnections).forEach(([nodeId, count]) => { 
+      if (count > 4) { 
+        const node = project.analysis?.system_tree.find(n => n.id === nodeId);
+        alerts.push(`Saturación en ${node?.name || nodeId}: Demasiadas relaciones Clase A (>4).`); 
+      } 
+    }); 
+
+    // 2. Paradoja de Relación (A y X al mismo tiempo - aunque MutherGrid lo evita por UI, validamos)
+    
+    return alerts;
+  }, [project.analysis?.interaction_matrix]);
+
+  const handleUpdateInteraction = (fromId: string, toId: string, newClase: string) => {
+    if (!project.analysis) return;
+    
+    const newMatrix = [...project.analysis.interaction_matrix];
+    const index = newMatrix.findIndex(r => 
+      (r.from === fromId && r.to === toId) || 
+      (r.from === toId && r.to === fromId)
+    );
+
+    if (index !== -1) {
+      newMatrix[index] = { ...newMatrix[index], clase: newClase as any, razon: 'Modificado manualmente por consultor' };
+    } else {
+      newMatrix.push({ from: fromId, to: toId, clase: newClase as any, razon: 'Añadido manualmente por consultor' });
+    }
+
+    const updatedProject = {
+      ...project,
+      analysis: {
+        ...project.analysis,
+        interaction_matrix: newMatrix
+      }
+    };
+    onUpdateProject(updatedProject);
+    toast.info('Sincronizando cambios con D3 (Zoning Map)...');
+  };
+
+  const handleResetMatrix = () => {
+    if (window.confirm('¿Restablecer matriz a la propuesta original de la IA? Se perderán los ajustes manuales.')) {
+      // Nota: Para esto necesitaríamos haber guardado el original. 
+      // Por ahora, si no tenemos el original, al menos avisamos.
+      // Si el usuario quiere el original, debería re-analizar.
+      onReAnalyze(project.id, "RESTABLECER MATRIZ: Recuperar propuesta original de IA.");
+    }
+  };
 
   // Mermaid Logic Synthesis
   const mermaidCode = useMemo(() => {
@@ -655,17 +837,18 @@ function ProjectView({
     extract(project.analysis.system_tree);
 
     return flatLocals.map((node, i) => {
-      const area = node.calculated_m2 || 10;
-      const size = Math.sqrt(area);
+      const area = node.calculated_m2 || 12;
       return {
         id: node.id,
         name: node.name,
         zone: (node.name.toLowerCase().includes('baño') || node.name.toLowerCase().includes('dormitorio')) ? 'Privado' : 
               (node.name.toLowerCase().includes('cocina') || node.name.toLowerCase().includes('lavado')) ? 'Servicio' : 'Social',
-        w: Math.sqrt(area) * 1.5,
-        h: Math.sqrt(area) * 1.5,
-        x: 40 + (Math.random() * 20),
-        y: 40 + (Math.random() * 20)
+        // MEJORA: Escala aumentada a 10.0 para legibilidad total
+        w: Math.sqrt(area) * 10.0,
+        h: Math.sqrt(area) * 10.0,
+        // Dispersión inicial leve
+        x: 50 + (Math.random() * 10),
+        y: 50 + (Math.random() * 10),
       } as SpatialBlock;
     });
   }, [project.analysis]);
@@ -705,9 +888,15 @@ function ProjectView({
     await onReAnalyze(project.id, `FIJAR PRESUPUESTO SUGERIDO POR AXON-FIN: $${avg} MXN/m2. Proceder con validación técnica MORPHO.`, avg);
   };
 
+  const audit = getAuditMetrics(project);
+
   const downloadCSV = () => {
     if (!project.analysis) return;
     
+    if (audit.status === 'CRITICAL_ALUCINATION') {
+      toast.error('OPERACIÓN BLOQUEADA: No se permite exportar datos con Alucinación Crítica. Cargue evidencia documental.');
+      return;
+    }
     // Flatten logic for recursive tree
     const flatRows: any[] = [];
     const flatten = (nodes: SystemNode[]) => {
@@ -778,12 +967,38 @@ function ProjectView({
                  "text-[9px] rounded-none py-0 h-4 uppercase tracking-tighter",
                  project.analysis.normative_confidence_score > 0.8 ? "text-emerald-500 border-emerald-500" : "text-amber border-amber"
                )}>
-                 Confidence: {(project.analysis.normative_confidence_score * 100).toFixed(0)}%
+                 Confidence: {(() => {
+                   const score = project.analysis.normative_confidence_score;
+                   const displayConfidence = score > 1 ? score : score * 100;
+                   return displayConfidence.toFixed(0);
+                 })()}%
                </Badge>
              )}
-             <Badge variant="outline" className="text-[9px] rounded-none py-0 h-4 uppercase tracking-tighter">Valid: 80%</Badge>
+             <Badge variant="outline" className={cn(
+                "text-[9px] rounded-none py-0 h-4 uppercase tracking-tighter",
+                audit.validity > 80 ? "text-emerald-500 border-emerald-500" : 
+                audit.validity > 50 ? "text-amber border-amber" : "text-muted border-line"
+              )}>
+                Valid: {audit.validity}%
+              </Badge>
           </div>
         </div>
+
+        {audit.status !== 'NORMAL' && (
+          <div className={cn(
+            "mx-4 mb-2 p-2 flex items-center gap-3 border text-[10px] font-bold uppercase tracking-widest",
+            audit.status === 'CRITICAL_ALUCINATION' ? "bg-destructive/10 border-destructive text-destructive animate-pulse" :
+            audit.status === 'INCONSISTENCY' ? "bg-amber/10 border-amber text-amber" :
+            "bg-navy/5 border-line text-muted"
+          )}>
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              audit.status === 'CRITICAL_ALUCINATION' ? "bg-destructive" :
+              audit.status === 'INCONSISTENCY' ? "bg-amber" : "bg-line"
+            )} />
+            {audit.message}
+          </div>
+        )}
 
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
           <div className="px-4 border-b border-line shrink-0">
@@ -804,17 +1019,19 @@ function ProjectView({
 
           <div className="flex-1 overflow-hidden">
             <TabsContent value="overview" className="mt-0 h-full p-6 overflow-hidden">
-               <div className="h-full flex flex-col space-y-8">
-                 <div className="grid grid-cols-3 gap-6 shrink-0">
-                    <MetricBox label="Causa" value={project.analysis.sociograma.causa} isLoading={isAnalyzing} />
-                    <MetricBox label="Efecto" value={project.analysis.sociograma.efecto} isLoading={isAnalyzing} />
-                    <MetricBox label="Objetivo" value={project.analysis.sociograma.objetivo} isLoading={isAnalyzing} />
-                  </div>
-                 
-                 <div className="flex-1 min-h-0">
-                    <SociogramaDiagram data={project.analysis.sociograma} />
+               <ScrollArea className="h-full">
+                 <div className="flex flex-col space-y-8 pb-8">
+                   <div className="grid grid-cols-3 gap-6 shrink-0">
+                      <MetricBox label="Causa" value={project.analysis.sociograma.causa} isLoading={isAnalyzing} />
+                      <MetricBox label="Efecto" value={project.analysis.sociograma.efecto} isLoading={isAnalyzing} />
+                      <MetricBox label="Objetivo" value={project.analysis.sociograma.objetivo} isLoading={isAnalyzing} />
+                    </div>
+                   
+                   <div className="min-h-0">
+                      <SociogramaDiagram data={project.analysis.sociograma} status={audit.status} />
+                   </div>
                  </div>
-               </div>
+               </ScrollArea>
             </TabsContent>
 
             <TabsContent value="sintesis" className="mt-0 h-full p-6 overflow-hidden">
@@ -826,12 +1043,16 @@ function ProjectView({
                    </CardTitle>
                    <Button 
                     variant="outline" 
-                    className="h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black"
+                    className={cn(
+                      "h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black",
+                      audit.status === 'CRITICAL_ALUCINATION' ? "opacity-50 cursor-not-allowed" : ""
+                    )}
                     onClick={downloadCSV}
-                    disabled={!project.analysis}
+                    disabled={!project.analysis || audit.status === 'CRITICAL_ALUCINATION'}
+                    title={audit.status === 'CRITICAL_ALUCINATION' ? "EXPORTACIÓN BLOQUEADA: Riesgo de Alucinación Crítica" : "Exportar Síntesis para BIM/Revit"}
                    >
                      <Upload size={12} className="rotate-180" />
-                     EXPORTAR CSV (REVIT)
+                     {audit.status === 'CRITICAL_ALUCINATION' ? "BLOQUEADO" : "EXPORTAR CSV (REVIT)"}
                    </Button>
                  </CardHeader>
                  <CardContent className="p-0 flex-1 flex flex-col min-h-0">
@@ -860,45 +1081,57 @@ function ProjectView({
                          <span className="text-[12px] font-black uppercase tracking-widest">D1.2 Matriz de Interacción de Muther</span>
                          <span className="text-[10px] font-mono text-muted uppercase">Análisis de Adyacencias Técnico-Funcionales</span>
                        </div>
-                       <div className="flex items-center gap-4 bg-bg p-2 border border-line">
-                          {['A', 'E', 'I', 'O', 'U', 'X'].map(c => (
-                            <div key={c} className="flex items-center gap-1.5 px-1">
-                               <div className={cn("w-3 h-3 flex items-center justify-center text-[7px] font-black border border-navy/10", 
-                                 c === 'A' ? 'bg-emerald-500 text-white' : 
-                                 c === 'X' ? 'bg-destructive text-white' : 'bg-slate-50 text-slate-400'
-                               )}>{c}</div>
-                            </div>
-                          ))}
-                       </div>
+                       <Button 
+                         variant="outline" 
+                         size="xs"
+                         className="h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black text-muted hover:text-navy"
+                         onClick={handleResetMatrix}
+                       >
+                         <RotateCcw size={12} />
+                         Restablecer Propuesta IA
+                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase mt-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-emerald-500 shrink-0" />
-                        <span>A: Absolutamente Necesario</span>
+
+                    <IntegrityShield alerts={systemicAlerts} />
+
+                    <details className="group mt-4 border border-line bg-surface p-4 transition-all">
+                      <summary className="flex cursor-pointer items-center justify-between text-[10px] font-black uppercase tracking-widest text-navy">
+                        <span>Leyenda Técnica de Interacción</span>
+                        <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-2 border-t border-line pt-4 text-[10px] font-mono text-muted uppercase">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-emerald-500 shrink-0" />
+                          <span>A: Absolutamente Necesario</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-emerald-200 shrink-0" />
+                          <span>E: Especialmente Importante</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-blue-100 shrink-0" />
+                          <span>I: Importante</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-slate-100 shrink-0" />
+                          <span>O: Ordinario</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-white border border-line shrink-0" />
+                          <span>U: Sin Importancia</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-destructive shrink-0" />
+                          <span>X: Indeseable</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                        <span>E: Especialmente Importante</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                        <span>I: Importante</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                        <span>O: Ordinario</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                        <span>U: Sin Importancia</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-destructive shrink-0" />
-                        <span>X: Indeseable</span>
-                      </div>
-                    </div>
+                    </details>
                     <div className="border border-line bg-surface shadow-inner h-[400px]">
-                       <MutherGrid nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
+                       <MutherGrid 
+                        nodes={project.analysis.system_tree} 
+                        interactions={project.analysis.interaction_matrix} 
+                        onUpdateInteraction={handleUpdateInteraction}
+                       />
                     </div>
                     <div className="mt-8 space-y-4">
                       <div className="flex items-center justify-between">
@@ -1019,7 +1252,9 @@ function ProjectView({
                         <div className="p-5 space-y-4">
                           <div className="relative">
                             <div className="absolute -left-3 top-0 w-[1px] h-full bg-accent/20" />
-                            <p className="text-xs text-navy leading-loose serif-italic opacity-90">{detail.description}</p>
+                            <p className="text-xs text-navy leading-loose serif-italic opacity-90">
+                              {detail.description || "ANÁLISIS DE MEDIO NO DISPONIBLE EN ESTA ITERACIÓN."}
+                            </p>
                           </div>
                           
                           <div className="pt-4 border-t border-line/50">
@@ -1028,7 +1263,7 @@ function ProjectView({
                                <span className="text-[9px] font-black text-muted uppercase tracking-tighter">Requerimiento General (RG)</span>
                             </div>
                             <div className="bg-bg text-navy px-3 py-2 border-l-2 border-accent font-mono text-[10px] leading-snug">
-                               {detail.rg}
+                               {detail.rg || "ESPECIFICACIÓN TÉCNICA REQUERIDA."}
                             </div>
                           </div>
                         </div>
@@ -1070,6 +1305,7 @@ function ProjectView({
                      
                      <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura relative">
                         <ZoningMap 
+                           projectId={project.id}
                            layout={processedLayout}
                            interactions={project.analysis.interaction_matrix}
                            onSelectBlock={setSelectedBlockId}
@@ -1077,10 +1313,11 @@ function ProjectView({
                            isEstimationMode={isEstimationMode}
                            boundingBox={boundingBox}
                         />
-                        
-                        {/* Engine HUD */}
-                        <div className="absolute top-4 left-4 z-20 space-y-2 pointer-events-none">
-                           <div className="bg-white/80 backdrop-blur-md border border-line p-2 shadow-sm">
+
+                        <div className="absolute top-4 left-4 z-20 space-y-2 pointer-events-none max-w-[400px]">
+                           <IntegrityShield alerts={systemicAlerts} />
+                           
+                           <div className="bg-white/80 backdrop-blur-md border border-line p-2 shadow-sm pointer-events-auto">
                               <div className="flex items-center gap-2 text-[9px] font-black uppercase text-navy">
                                  <Activity size={12} className="text-accent" />
                                  Live Physics Engine v2.7

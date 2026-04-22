@@ -2,13 +2,15 @@ import React from 'react';
 import { InteractionRelation, SystemNode } from '../types';
 import { cn } from '../lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Info, Target } from 'lucide-react';
 
 interface MutherGridProps {
   nodes: SystemNode[];
   interactions: InteractionRelation[];
+  onUpdateInteraction?: (fromId: string, toId: string, newClase: string) => void;
 }
 
-export const MutherGrid: React.FC<MutherGridProps> = ({ nodes, interactions }) => {
+export const MutherGrid: React.FC<MutherGridProps> = ({ nodes, interactions, onUpdateInteraction }) => {
   const flatLocals: SystemNode[] = [];
   const extract = (list: SystemNode[]) => {
     list.forEach(n => {
@@ -45,6 +47,14 @@ export const MutherGrid: React.FC<MutherGridProps> = ({ nodes, interactions }) =
 
   if (flatLocals.length === 0) return null;
 
+  const handleCellClick = (fromId: string, toId: string, currentClase: string) => {
+    if (!onUpdateInteraction) return;
+    const classes = ['A', 'E', 'I', 'O', 'U', 'X'];
+    const currentIndex = classes.indexOf(currentClase);
+    const nextIndex = (currentIndex + 1) % classes.length;
+    onUpdateInteraction(fromId, toId, classes[nextIndex]);
+  };
+
   return (
     <div className="w-full overflow-auto border border-line bg-surface">
       <TooltipProvider>
@@ -68,19 +78,49 @@ export const MutherGrid: React.FC<MutherGridProps> = ({ nodes, interactions }) =
                    {rowNode.name}
                 </td>
                 {flatLocals.map((colNode, j) => {
-                  if (i === j) return <td key={colNode.id} className="border border-line bg-slate-200" />;
-                  if (j < i) return <td key={colNode.id} className="border border-line bg-slate-50/50" />;
+                  if (i === j) return (
+                    <td key={colNode.id} className="border border-line bg-slate-100 flex items-center justify-center h-full min-h-[40px]">
+                      <Target size={12} className="text-navy/20" />
+                    </td>
+                  );
                   
                   const clase = getClase(rowNode.id, colNode.id);
                   const razon = getRazon(rowNode.id, colNode.id);
 
+                  if (j < i) return (
+                    <Tooltip key={colNode.id}>
+                      <TooltipTrigger asChild>
+                        <td 
+                          onClick={() => handleCellClick(rowNode.id, colNode.id, clase)}
+                          className={cn(
+                            "border border-line bg-slate-50/30 text-center opacity-40 transition-colors hover:bg-slate-100",
+                            onUpdateInteraction ? "cursor-pointer" : "cursor-help"
+                          )}
+                        >
+                          <div className="flex items-center justify-center">
+                            <span className="text-[7px] font-black">{clase}</span>
+                          </div>
+                        </td>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-navy text-white text-[10px] p-2 rounded-none border-accent border">
+                        <div className="font-black uppercase mb-1">Relación Simétrica</div>
+                        <div className="text-accent uppercase font-black tracking-widest text-[8px] mb-2">{colNode.name} ↔ {rowNode.name}</div>
+                        <div className="italic opacity-80 italic">"Definida en el nodo superior ({clase}). {onUpdateInteraction ? 'Clic para editar ambos.' : ''}"</div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+
                   return (
                     <Tooltip key={colNode.id}>
                       <TooltipTrigger asChild>
-                        <td className={cn(
-                          "border border-line text-center font-black cursor-help transition-colors hover:brightness-90",
-                          colorMap[clase]
-                        )}>
+                        <td 
+                          onClick={() => handleCellClick(rowNode.id, colNode.id, clase)}
+                          className={cn(
+                            "border border-line text-center font-black transition-colors hover:brightness-90",
+                            colorMap[clase],
+                            onUpdateInteraction ? "cursor-pointer" : "cursor-help"
+                          )}
+                        >
                           {clase}
                         </td>
                       </TooltipTrigger>
@@ -88,6 +128,7 @@ export const MutherGrid: React.FC<MutherGridProps> = ({ nodes, interactions }) =
                         <div className="font-black uppercase mb-1">{rowNode.name} ↔ {colNode.name}</div>
                         <div className="text-accent uppercase font-black tracking-widest text-[8px] mb-2">Clase {clase}</div>
                         <div className="italic opacity-80">"{razon}"</div>
+                        {onUpdateInteraction && <div className="mt-2 text-accent/50 text-[7px] font-black uppercase tracking-tighter">Clic para iterar clase</div>}
                       </TooltipContent>
                     </Tooltip>
                   );

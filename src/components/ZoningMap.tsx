@@ -6,6 +6,7 @@ import { useZoning } from '../hooks/useZoning';
 import { cn } from '../lib/utils';
 
 interface ZoningMapProps {
+  projectId: string; // Añadimos ID para estabilidad
   layout: SpatialBlock[];
   interactions: InteractionRelation[];
   onSelectBlock: (id: string) => void;
@@ -15,6 +16,7 @@ interface ZoningMapProps {
 }
 
 export const ZoningMap: React.FC<ZoningMapProps> = ({ 
+  projectId,
   layout: initialLayout, 
   interactions, 
   onSelectBlock, 
@@ -25,10 +27,32 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
 
-  const { layout, setBlockPosition, unlockBlock, coherenceAlerts } = useZoning(initialLayout, interactions, boundingBox);
+  const { layout, setBlockPosition, unlockBlock, coherenceAlerts } = useZoning(initialLayout, interactions, projectId, boundingBox);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(true);
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+        if (canvasRef.current) canvasRef.current.style.cursor = 'crosshair';
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   const colors = {
     Privado: '#002F56', // Azul RAUVIA
@@ -38,7 +62,7 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    if (e.button === 1 || (e.button === 0 && (e.altKey || isSpacePressed))) {
       setIsPanning(true);
     }
   };
@@ -51,17 +75,17 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
       }));
     } else if (draggedId && canvasRef.current) {
        const rect = canvasRef.current.getBoundingClientRect();
-       const mouseX = (e.clientX - rect.left - offset.x) / zoom;
-       const mouseY = (e.clientY - rect.top - offset.y) / zoom;
        
-       // Coordinate normalization back to 0-100 based on viewport
-       // However, the SVG is viewBox 0 0 100 100, so we need to map mouse correctly
-       const svgWidth = rect.width;
-       const svgHeight = rect.height;
-       const normX = (mouseX / svgWidth) * 100;
-       const normY = (mouseY / svgHeight) * 100;
-
-       setBlockPosition(draggedId, normX, normY);
+       // FÓRMULA RAUVIA STABLE:
+       // (PosiciónMouse - InicioContenedor - DesplazamientoCámara) / EscalaZoom / AnchoReal * 100
+       const x = ((e.clientX - rect.left - offset.x) / zoom / rect.width) * 100;
+       const y = ((e.clientY - rect.top - offset.y) / zoom / rect.height) * 100;
+   
+       const block = layout.find(b => b.id === draggedId);
+       if (block) {
+         // Centrar el bloque en la punta del cursor
+         setBlockPosition(draggedId, x - (block.w / 2), y - (block.h / 2));
+       }
     }
   };
 
@@ -175,8 +199,8 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
       >
         {/* Adjacency Lines (Edges) */}
         {primaryInteractions.map((rel, i) => {
-          const from = layout.find(b => b.name === rel.from);
-          const to = layout.find(b => b.name === rel.to);
+          const from = layout.find(b => b.id === rel.from);
+          const to = layout.find(b => b.id === rel.to);
           if (!from || !to) return null;
           
           return (
@@ -205,9 +229,7 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
             }}
             className="cursor-pointer group"
           >
-            <motion.rect 
-              layout
-              transition={{ type: "spring", stiffness: 100, damping: 20 }}
+            <rect 
               x={block.x} y={block.y}
               width={block.w} height={block.h}
               fill={colors[block.zone as keyof typeof colors]}
@@ -217,20 +239,31 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
               className="transition-all duration-300"
             />
             
-            {/* Label */}
-            <text 
-              x={block.x + block.w/2} 
-              y={block.y + block.h/2}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill="white"
-              fontSize="2.5"
-              fontFamily="monospace"
-              fontWeight="bold"
-              className="pointer-events-none select-none uppercase"
-            >
-              {block.name || block.label || block.id || "NODO_SISTEMICO"}
-            </text>
+            {/* Label Group */}
+            <g className="pointer-events-none select-none">
+              {/* Fondo blanco protector para el texto */}
+              <rect 
+                x={block.x + 2} 
+                y={block.y + block.h/2 - 2.5} 
+                width={block.w - 4} 
+                height="5" 
+                fill="white" 
+                fillOpacity="0.9" 
+                rx="0.5" 
+              />
+              <text 
+                x={block.x + block.w/2} 
+                y={block.y + block.h/2} 
+                textAnchor="middle" 
+                dominantBaseline="middle" 
+                fill="#002F56" 
+                fontSize="1.8" 
+                fontWeight="900" 
+                className="uppercase" 
+              > 
+                {block.name} 
+              </text> 
+            </g>
 
             {block.isLocked && (
                <foreignObject x={block.x + block.w - 4} y={block.y + 1} width="4" height="4">
@@ -240,16 +273,17 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
 
             <text 
               x={block.x + block.w/2} 
-              y={block.y + block.h/2 + 3}
+              y={block.y + block.h/2 + 4}
               textAnchor="middle"
               dominantBaseline="middle"
-              fill="white"
-              fillOpacity="0.5"
-              fontSize="1.5"
+              fill="#002F56"
+              fillOpacity="0.7"
+              fontSize="1.2"
               fontFamily="monospace"
+              fontWeight="bold"
               className="pointer-events-none select-none"
             >
-              {Math.round(block.w * block.h)}m²
+              {Math.round((block.w * block.h) / 100)}m²
             </text>
           </g>
         ))}
@@ -281,7 +315,7 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
 
       {/* Instructional Overlay */}
       <div className="absolute bottom-6 left-6 text-[8px] font-mono text-muted uppercase tracking-widest bg-white/50 px-2 py-1">
-        Wheel + Ctrl: Zoom // Mouse 2: Pan // Click: Seleccionar Local
+        Wheel + Ctrl: Zoom // Space + Click: Pan // Click + Drag: Mover Local
       </div>
     </div>
   );
