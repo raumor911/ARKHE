@@ -30,6 +30,7 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [touchStartDist, setTouchStartDist] = useState<number | null>(null);
 
   const { layout, setBlockPosition, unlockBlock, coherenceAlerts } = useZoning(initialLayout, interactions, projectId, boundingBox);
 
@@ -96,18 +97,43 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
 
   const hasAlerts = coherenceAlerts.length > 0;
 
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        setZoom(prev => Math.min(Math.max(prev * delta, 0.5), 5));
-      }
-    };
-    const canvas = canvasRef.current;
-    canvas?.addEventListener('wheel', handleWheel, { passive: false });
-    return () => canvas?.removeEventListener('wheel', handleWheel);
-  }, []);
+  useEffect(() => { 
+    const handleWheel = (e: WheelEvent) => { 
+      if (e.ctrlKey || e.metaKey) { 
+        e.preventDefault(); 
+        const delta = e.deltaY > 0 ? 0.9 : 1.1; 
+        setZoom(prev => Math.min(Math.max(prev * delta, 0.4), 5)); 
+      } 
+    }; 
+  
+    const canvas = canvasRef.current; 
+    if (canvas) { 
+      canvas.addEventListener('wheel', handleWheel, { passive: false }); 
+    } 
+    return () => canvas?.removeEventListener('wheel', handleWheel); 
+  }, [canvasRef.current, projectId]); // Se reinicia con el proyecto o al montar el canvas 
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].pageX - e.touches[1].pageX,
+        e.touches[0].pageY - e.touches[1].pageY
+      );
+      setTouchStartDist(dist);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStartDist !== null) {
+      const dist = Math.hypot(
+        e.touches[0].pageX - e.touches[1].pageX,
+        e.touches[0].pageY - e.touches[1].pageY
+      );
+      const delta = dist / touchStartDist;
+      setZoom(prev => Math.min(Math.max(prev * delta, 0.5), 5));
+      setTouchStartDist(dist);
+    }
+  };
 
   // Filter primary interactions (A, E) for visual edge rendering
   const primaryInteractions = interactions.filter(rel => rel.clase === 'A' || rel.clase === 'E');
@@ -123,6 +149,9 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={() => setTouchStartDist(null)}
     >
       {/* Grid Pattern Background */}
       <div 
@@ -198,12 +227,9 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
         }}
       >
         <defs> 
-          <filter id="glow"> 
-            <feGaussianBlur stdDeviation="1.5" result="coloredBlur" /> 
-            <feMerge> 
-              <feMergeNode in="coloredBlur" /> 
-              <feMergeNode in="SourceGraphic" /> 
-            </feMerge> 
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%"> 
+            <feGaussianBlur stdDeviation="2.5" result="blur" /> 
+            <feComposite in="SourceGraphic" in2="blur" operator="over" /> 
           </filter> 
         </defs>
 
@@ -245,43 +271,31 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
               fill={colors[block.zone as keyof typeof colors] || '#6B7280'}
               fillOpacity={selectedId === block.id ? 1 : 0.7}
               stroke={block.isSnapping ? "#00E0FF" : (selectedId === block.id ? "#00E0FF" : "white")}
-              strokeWidth={block.isSnapping ? "1.5" : (selectedId === block.id ? "1.5" : "0.5")}
+              strokeWidth={block.isSnapping ? "2" : (selectedId === block.id ? "1.5" : "0.5")}
               filter={block.isSnapping ? "url(#glow)" : "none"}
-              className="transition-all duration-200"
+              className="transition-all duration-300"
             />
             
             {/* Capa de Legibilidad: Texto con fondo protector */} 
             <g className="pointer-events-none select-none">
-              {/* Placa de datos de alto contraste */} 
+              {/* FONDO BLANCO: Garantiza visibilidad en agrupamientos */} 
               <rect 
-                x={block.x + 1} 
-                y={block.y + block.h/2 - 2.8} 
-                width={block.w - 2} 
-                height="5.6" 
-                fill="white" 
-                fillOpacity="0.9" 
-                rx="0.5" 
+                x={block.x + 1} y={block.y + block.h/2 - 3.5} 
+                width={block.w - 2} height="7" 
+                fill="white" fillOpacity="0.95" rx="0.5" 
               />
               <text 
-                x={block.x + block.w/2} 
-                y={block.y + block.h/2} 
-                textAnchor="middle" 
-                dominantBaseline="middle" 
-                fill="#002F56" 
-                fontSize="1.8" 
-                fontWeight="900" 
-                className="uppercase" 
+                x={block.x + block.w/2} y={block.y + block.h/2 - 0.5} 
+                textAnchor="middle" dominantBaseline="middle" 
+                fill="#002F56" fontSize="2.2" fontWeight="900" className="uppercase" 
               > 
                 {block.name} 
               </text> 
+              {/* ÁREA CORREGIDA: m2 reales */} 
               <text 
-                x={block.x + block.w/2} 
-                y={block.y + block.h/2 + 4} 
-                textAnchor="middle" 
-                fill="#002F56" 
-                fillOpacity="0.6" 
-                fontSize="1.0" 
-                fontWeight="bold" 
+                x={block.x + block.w/2} y={block.y + block.h/2 + 4.5} 
+                textAnchor="middle" fill="#002F56" fillOpacity="0.6" 
+                fontSize="1.3" fontWeight="bold" 
               > 
                 {Math.round((block.w * block.h) / 100)} m² 
               </text> 
