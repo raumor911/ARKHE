@@ -24,7 +24,8 @@ import {
   FolderOpen,
   ArrowRight,
   Pencil,
-  RotateCcw
+  RotateCcw,
+  Activity as ActivityIcon
 } from 'lucide-react';
 import {
   Table,
@@ -241,6 +242,85 @@ export default function App() {
     }
   };
 
+  const GlobalAuditPanel = ({ projects, getAuditMetrics, onSelect }: { 
+    projects: Project[], 
+    getAuditMetrics: (p: Project) => any, 
+    onSelect: (id: string) => void 
+  }) => { 
+    // Filtramos para mostrar primero los que tienen alucinación crítica 
+    const sortedProjects = [...projects].sort((a, b) => { 
+      const aStatus = getAuditMetrics(a).status === 'CRITICAL_ALUCINATION' ? 0 : 1; 
+      const bStatus = getAuditMetrics(b).status === 'CRITICAL_ALUCINATION' ? 0 : 1; 
+      return aStatus - bStatus; 
+    }); 
+  
+    return ( 
+      <div className="space-y-6 py-4"> 
+        <div className="flex items-center justify-between border-b border-line pb-4"> 
+          <div className="flex flex-col"> 
+            <span className="text-[12px] font-black text-navy uppercase tracking-widest">Auditoría de Integridad en Proyectos</span> 
+            <span className="text-[9px] font-mono text-muted uppercase">AR-TRACE v2.4 // Monitoreo Activo</span> 
+          </div> 
+        </div> 
+  
+        <ScrollArea className="h-[450px] pr-4"> 
+          <div className="space-y-4"> 
+            {sortedProjects.map(p => { 
+              const audit = getAuditMetrics(p); 
+              const isCritical = audit.status === 'CRITICAL_ALUCINATION'; 
+              
+              return ( 
+                <div 
+                  key={p.id} 
+                  onClick={() => onSelect(p.id)} 
+                  className={cn( 
+                    "p-4 border group cursor-pointer transition-all hover:translate-x-1", 
+                    isCritical ? "bg-destructive/5 border-destructive/40 shadow-[0_0_15px_rgba(239,68,68,0.1)]" : "bg-bg border-line hover:border-accent" 
+                  )} 
+                > 
+                  <div className="flex items-center justify-between mb-3"> 
+                    <span className="text-[11px] font-black text-navy uppercase group-hover:text-accent transition-colors"> 
+                      {p.name} 
+                    </span> 
+                    <Badge variant="outline" className={cn( 
+                      "text-[8px] rounded-none py-0 h-4 uppercase", 
+                      audit.validity > 80 ? "text-emerald-500 border-emerald-500" : "text-amber border-amber" 
+                    )}> 
+                      Valid: {audit.validity}% 
+                    </Badge> 
+                  </div> 
+  
+                  <div className="grid grid-cols-2 gap-4 mb-3"> 
+                    <div className="flex flex-col gap-0.5"> 
+                      <span className="text-[8px] font-bold text-muted uppercase">Confianza IA</span> 
+                      <span className="text-[10px] font-mono font-bold text-navy"> 
+                        {(p.analysis?.normative_confidence_score * 100).toFixed(0)}% 
+                      </span> 
+                    </div> 
+                    <div className="flex flex-col gap-0.5"> 
+                      <span className="text-[8px] font-bold text-muted uppercase">Evidencia</span> 
+                      <span className="text-[10px] font-mono font-bold text-navy">{p.files.length} archivos</span> 
+                    </div> 
+                  </div> 
+  
+                  {audit.status !== 'NORMAL' && ( 
+                    <div className={cn( 
+                      "p-2 text-[9px] font-bold uppercase flex items-center gap-2 border", 
+                      isCritical ? "bg-white text-destructive border-destructive/20" : "bg-white text-amber border-amber/20" 
+                    )}> 
+                      <AlertTriangle size={10} className={isCritical ? "animate-pulse" : ""} /> 
+                      {audit.message} 
+                    </div> 
+                  )} 
+                </div> 
+              ); 
+            })} 
+          </div> 
+        </ScrollArea> 
+      </div> 
+    ); 
+  };
+
   const resetForm = () => {
     setNewName('');
     setNewDesc('');
@@ -326,24 +406,25 @@ export default function App() {
         animate={{ width: isSidebarCollapsed ? 64 : 280 }}
         className="border-r border-line bg-surface flex flex-col z-20 shrink-0 relative"
       >
-        <div className="h-16 border-b border-line flex items-center px-4 justify-between shrink-0">
-          {!isSidebarCollapsed && (
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }}
-              className="flex-1"
-            >
-              <ArkheLogo variant="full" size={32} isAnalyzing={isAnalyzing} />
-            </motion.div>
-          )}
-          {isSidebarCollapsed && (
-            <div className="flex-1 flex justify-center">
-              <ArkheLogo variant="icon" size={28} isAnalyzing={isAnalyzing} />
-            </div>
-          )}
+        <div className="h-16 border-b border-line flex items-center px-4 justify-center shrink-0 relative">
+          <AnimatePresence mode="wait">
+            {!isSidebarCollapsed && (
+              <motion.div 
+                key="sidebar-logo"
+                initial={{ opacity: 0, scale: 0.9 }} 
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+                className="flex justify-center"
+              >
+                <ArkheLogo variant="icon" size={32} isAnalyzing={isAnalyzing} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="p-1 hover:bg-bg rounded-none border border-line text-navy"
+            className="absolute right-4 p-1 hover:bg-bg rounded-none border border-line text-navy z-30"
           >
             {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
@@ -499,10 +580,32 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="border-accent text-accent bg-accent/5 rounded-none text-[9px] py-0 px-1.5 h-5 flex items-center gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              AR-TRACE: ACTIVE
-            </Badge>
+            <Dialog> 
+              <DialogTrigger asChild> 
+                <button className="group outline-none hover:opacity-80 transition-all"> 
+                  <Badge variant="outline" className="border-accent text-accent bg-accent/5 rounded-none text-[9px] py-0 px-1.5 h-5 flex items-center gap-1 cursor-pointer group-hover:border-navy transition-all"> 
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> 
+                    AR-TRACE: ACTIVE 
+                  </Badge> 
+                </button> 
+              </DialogTrigger> 
+              <DialogContent className="sm:max-w-md border-line rounded-none bg-surface p-6 shadow-2xl"> 
+                <DialogHeader> 
+                  <DialogTitle className="flex items-center gap-3 text-navy font-black uppercase tracking-tighter"> 
+                    <ActivityIcon size={18} className="text-accent" /> 
+                    Centro de Control AR-TRACE 
+                  </DialogTitle> 
+                </DialogHeader> 
+                <GlobalAuditPanel 
+                  projects={projects} 
+                  getAuditMetrics={getAuditMetrics} 
+                  onSelect={(id) => { 
+                    setActiveProjectId(id); 
+                    toast.info(`Navegando al expediente: ${projects.find(p => p.id === id)?.name}`); 
+                  }} 
+                /> 
+              </DialogContent> 
+            </Dialog> 
           </div>
         </header>
 

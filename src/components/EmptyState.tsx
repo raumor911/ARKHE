@@ -17,7 +17,7 @@ export function EmptyState({ onStart, isAnalyzing }: { onStart: () => void; isAn
         </div>
         <h3 className="text-xl font-serif italic text-navy mb-2">Motor Lógico Preparado</h3>
         <p className="text-xs text-muted mb-8 uppercase tracking-widest font-medium">
-          EL MOTOR LÓGICO ARKHÉ ESTÁ LISTO. INICIE UN NUEVO PROYECTO PARA COMENZAR EL ANÁLISIS SISTÉMICO.
+          INICIE UN NUEVO PROYECTO PARA COMENZAR EL ANÁLISIS SISTÉMICO.
         </p>
         <Button 
           onClick={onStart}
