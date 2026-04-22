@@ -15,15 +15,15 @@ export function EmptyState({ onStart, isAnalyzing }: { onStart: () => void; isAn
            <ArkheLogo variant="icon" size={80} isAnalyzing={isAnalyzing} />
            <div className="absolute -inset-4 bg-accent/5 rounded-full blur-2xl animate-pulse -z-10" />
         </div>
-        <h3 className="text-xl font-serif italic text-navy mb-2">Ingesta Pendiente</h3>
+        <h3 className="text-xl font-serif italic text-navy mb-2">Motor Lógico Preparado</h3>
         <p className="text-xs text-muted mb-8 uppercase tracking-widest font-medium">
-          El motor lógico ARKHÉ está en reposo. Inicie un nuevo expediente para comenzar el análisis sistémico.
+          EL MOTOR LÓGICO ARKHÉ ESTÁ LISTO. INICIE UN NUEVO PROYECTO PARA COMENZAR EL ANÁLISIS SISTÉMICO.
         </p>
         <Button 
           onClick={onStart}
           className="rounded-none bg-navy font-bold text-[10px] px-8 tracking-[.2em] uppercase h-12"
         >
-          NUEVA INGESTA
+          NUEVO PROYECTO
         </Button>
       </motion.div>
     </div>

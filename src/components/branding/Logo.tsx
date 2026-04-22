@@ -20,8 +20,8 @@ export const ArkheLogo: React.FC<LogoProps> = ({
       {/* SÍMBOLO: Escultura Paramétrica + Red Neuronal */}
       <div 
         className={cn(
-          "relative flex items-center justify-center overflow-hidden rounded-xl bg-white shadow-xl transition-all duration-500",
-          isAnalyzing && "ring-2 ring-[#00E0FF] ring-offset-2 ring-offset-bg"
+          "relative flex items-center justify-center transition-all duration-500",
+          isAnalyzing && "ring-2 ring-[#00E0FF] ring-offset-2 ring-offset-bg rounded-xl"
         )}
         style={{ width: size, height: size }}
       >
@@ -29,10 +29,9 @@ export const ArkheLogo: React.FC<LogoProps> = ({
           src="/branding/logo.png" 
           alt="ARKHÉ Icon" 
           className={cn(
-            "w-[140%] h-[140%] object-cover transform transition-transform duration-700",
-            isAnalyzing ? "scale-150 rotate-12" : "hover:scale-115"
+            "w-full h-full object-contain transform transition-transform duration-700",
+            isAnalyzing ? "scale-110" : "hover:scale-105"
           )}
-          style={{ objectPosition: 'center 20%' }} // Focus on the symbol part of the full logo image
           onError={(e) => {
             // Fallback to a styled div if image fails
             e.currentTarget.style.display = 'none';
@@ -40,7 +39,7 @@ export const ArkheLogo: React.FC<LogoProps> = ({
           referrerPolicy="no-referrer"
         />
         {/* CSS Fallback Symbol (Visible if image fails) */}
-        <div className="absolute inset-0 flex items-center justify-center -z-10 bg-gradient-to-br from-[#002F56] to-[#001A30]">
+        <div className="absolute inset-0 flex items-center justify-center -z-10">
           <Layers size={size * 0.6} className="text-[#00E0FF] opacity-40 animate-pulse" />
         </div>
         

@@ -358,7 +358,7 @@ export default function App() {
             }}
           >
             <Plus size={14} />
-            {!isSidebarCollapsed && "NUEVA INGESTA"}
+            {!isSidebarCollapsed && "NUEVO PROYECTO"}
           </Button>
           {!isSidebarCollapsed && (
             <div className="mt-4 relative">
@@ -448,7 +448,6 @@ export default function App() {
           <div className="mt-auto border-t border-line p-4 space-y-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-black text-muted uppercase tracking-widest">Memoria Local</span>
-              <span className="text-[9px] font-mono text-accent">Active</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button 
@@ -483,31 +482,12 @@ export default function App() {
                   onChange={handleImportBackup}
                 />
               </Button>
-              <Button 
-                variant="outline" 
-                size="xs" 
-                className="text-[8px] h-6 rounded-none border-line hover:text-destructive hover:bg-destructive/5 col-span-2"
-                onClick={async () => {
-                  if (window.confirm('¿PURGAR TODA LA MEMORIA? Esta acción es irreversible.')) {
-                    await storageService.clearAll();
-                    setProjects([]);
-                    setActiveProjectId(null);
-                    toast.success('Memoria purgada totalmente.');
-                  }
-                }}
-              >
-                PURGAR TODA LA MEMORIA LOCAL
-              </Button>
+
             </div>
           </div>
         )}
 
-        {!isSidebarCollapsed && (
-          <div className="p-4 border-t border-line text-[9px] font-mono text-muted uppercase flex justify-between">
-            <span>v2.4 (AAA)</span>
-            <span className="text-accent animate-pulse">● SYS_READY</span>
-          </div>
-        )}
+
       </motion.aside>
 
       {/* MAIN CONTENT AREA */}
@@ -516,27 +496,13 @@ export default function App() {
         <header className="h-16 border-b border-line px-6 flex items-center justify-between bg-surface/50 backdrop-blur-md sticky top-0 z-50 shrink-0">
           <div className="flex items-center gap-12">
             <ArkheLogo variant="full" size={36} isAnalyzing={isAnalyzing} className="hidden lg:flex" />
-            
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Activity size={18} className="text-accent" />
-                <div className="flex flex-col leading-none">
-                  <span className="text-[10px] font-black text-navy uppercase tracking-widest">Motor Lógico</span>
-                  <span className="text-[8px] font-mono text-muted">AISTUDIO_GEMINI_PRO</span>
-                </div>
-              </div>
-              <div className="h-8 w-[1px] bg-line" />
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-accent text-accent bg-accent/5 rounded-none text-[9px] py-0 px-1.5 h-5 flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                  AR-TRACE: ACTIVE
-                </Badge>
-              </div>
-            </div>
           </div>
 
           <div className="flex items-center gap-4">
-             {/* Profile removed - awaiting OAuth integration */}
+            <Badge variant="outline" className="border-accent text-accent bg-accent/5 rounded-none text-[9px] py-0 px-1.5 h-5 flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              AR-TRACE: ACTIVE
+            </Badge>
           </div>
         </header>
 
@@ -586,9 +552,8 @@ export default function App() {
             <div className="w-7/12 p-8 border-r border-line bg-surface overflow-y-auto scrollbar-hide">
               <div className="mb-8">
                 <h2 className="text-2xl font-serif italic text-navy">
-                  {editingProjectId ? "Editar Expediente ARKHÉ" : "Nueva Ingesta ARKHÉ"}
+                  {editingProjectId ? "Editar Proyecto ARKHÉ" : "Nuevo Proyecto ARKHÉ"}
                 </h2>
-                <p className="technical-label mt-1">Gobernanza de Proyectos Sistémicos</p>
               </div>
 
               <div className="space-y-6">
@@ -672,7 +637,7 @@ export default function App() {
               <div className="mt-auto space-y-4">
                 <div className="p-4 bg-navy/[0.03] border border-line space-y-3">
                    <div className="flex items-center justify-between">
-                     <span className="text-[9px] font-bold uppercase tracking-tighter text-muted">Satus de Agentes</span>
+                     <span className="text-[9px] font-bold uppercase tracking-tighter text-muted">ESTATUS</span>
                      <span className="text-[9px] font-mono text-accent">STANDBY</span>
                    </div>
                    <div className="space-y-2">
