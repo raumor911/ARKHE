@@ -836,19 +836,17 @@ function ProjectView({
     };
     extract(project.analysis.system_tree);
 
-    return flatLocals.map((node, i) => {
-      const area = node.calculated_m2 || 12;
+    return flatLocals.map((node) => {
+      // SEGURO RAUVIA: Fallback a 12m2 para locales sin área detectada
+      const area = (node.calculated_m2 && node.calculated_m2 > 0) ? node.calculated_m2 : 12;
       return {
         id: node.id,
         name: node.name,
         zone: (node.name.toLowerCase().includes('baño') || node.name.toLowerCase().includes('dormitorio')) ? 'Privado' : 
               (node.name.toLowerCase().includes('cocina') || node.name.toLowerCase().includes('lavado')) ? 'Servicio' : 'Social',
-        // MEJORA: Escala aumentada a 10.0 para legibilidad total
-        w: Math.sqrt(area) * 10.0,
+        w: Math.sqrt(area) * 10.0, // Multiplicador para legibilidad total
         h: Math.sqrt(area) * 10.0,
-        // Dispersión inicial leve
-        x: 50 + (Math.random() * 10),
-        y: 50 + (Math.random() * 10),
+        x: 50, y: 50 // Nacen al centro para ser atraídos por fuerzas
       } as SpatialBlock;
     });
   }, [project.analysis]);

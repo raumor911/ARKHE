@@ -53,18 +53,39 @@ export const useZoning = (
 
     // Setup simulation
     const simulation = forceSimulation<D3Block>(blocksRef.current)
-      .force("charge", forceManyBody().strength(-20))
+      .force("charge", forceManyBody().strength(-40)) // Repulsión para evitar clumping inicial
       .force("center", forceCenter(50, 50))
-      .force("collide", forceCollide<D3Block>().radius(d => (d.w || 10) / 2 + 3).iterations(3))
-      .force("link", forceLink<D3Block, any>(d3Links).id(d => d.id).distance(25))
-      .alphaDecay(0.05) // Control de enfriamiento (Evita loop infinito)
+      .force("collide", forceCollide<D3Block>().radius(d => (d.w || 10) / 2 + 2))
+      .force("snap", () => { 
+        // LÓGICA DE SNAPPING: Alinea bloques cercanos 
+        blocksRef.current.forEach(b1 => { 
+          blocksRef.current.forEach(b2 => { 
+            if (b1.id === b2.id) return; 
+            // Umbral de proximidad para el snap (2 unidades) 
+            const threshold = 2.5; 
+            const dx = Math.abs((b1.x + b1.w) - b2.x); // Borde derecho b1 -> Borde izquierdo b2 
+            const dy = Math.abs(b1.y - b2.y); // Alineación horizontal 
+            
+            if (dx < threshold && dy < threshold) { 
+              b1.x = b2.x - b1.w; 
+              b1.y = b2.y; 
+              (b1 as any).isSnapping = true; // Flag para el Glow 
+            } else { 
+              (b1 as any).isSnapping = false; 
+            } 
+          }); 
+        }); 
+      }) 
+      .force("link", forceLink<D3Block, any>(d3Links).id(d => d.id).distance(25).strength(0.8))
+      .alphaDecay(0.08) // Enfriamiento optimizado anti-loop 
       .on("tick", () => {
         // Sync simulation state back to React
         setLayout(blocksRef.current.map(n => ({
           ...n,
           x: n.x || 0,
-          y: n.y || 0
-        } as SpatialBlock)));
+          y: n.y || 0,
+          isSnapping: (n as any).isSnapping
+        } as any)));
       });
 
     simulationRef.current = simulation;

@@ -59,6 +59,7 @@ export interface SpatialBlock {
   w: number; 
   h: number;
   isLocked?: boolean;
+  isSnapping?: boolean;
 }
 
 export interface SpektrResult {

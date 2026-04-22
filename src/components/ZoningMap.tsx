@@ -197,6 +197,16 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
           transformOrigin: 'center'
         }}
       >
+        <defs> 
+          <filter id="glow"> 
+            <feGaussianBlur stdDeviation="1.5" result="coloredBlur" /> 
+            <feMerge> 
+              <feMergeNode in="coloredBlur" /> 
+              <feMergeNode in="SourceGraphic" /> 
+            </feMerge> 
+          </filter> 
+        </defs>
+
         {/* Adjacency Lines (Edges) */}
         {primaryInteractions.map((rel, i) => {
           const from = layout.find(b => b.id === rel.from);
@@ -227,26 +237,27 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
                  setDraggedId(block.id);
               }
             }}
-            className="cursor-pointer group"
+            className="cursor-grab active:cursor-grabbing group"
           >
             <rect 
               x={block.x} y={block.y}
               width={block.w} height={block.h}
-              fill={colors[block.zone as keyof typeof colors]}
-              fillOpacity={selectedId === block.id ? 0.9 : 0.6}
-              stroke={selectedId === block.id ? "#00E0FF" : (block.isLocked ? "white" : "transparent")}
-              strokeWidth={block.isLocked ? "0.3" : "0.8"}
-              className="transition-all duration-300"
+              fill={colors[block.zone as keyof typeof colors] || '#6B7280'}
+              fillOpacity={selectedId === block.id ? 1 : 0.7}
+              stroke={block.isSnapping ? "#00E0FF" : (selectedId === block.id ? "#00E0FF" : "white")}
+              strokeWidth={block.isSnapping ? "1.5" : (selectedId === block.id ? "1.5" : "0.5")}
+              filter={block.isSnapping ? "url(#glow)" : "none"}
+              className="transition-all duration-200"
             />
             
-            {/* Label Group */}
+            {/* Capa de Legibilidad: Texto con fondo protector */} 
             <g className="pointer-events-none select-none">
-              {/* Fondo blanco protector para el texto */}
+              {/* Placa de datos de alto contraste */} 
               <rect 
-                x={block.x + 2} 
-                y={block.y + block.h/2 - 2.5} 
-                width={block.w - 4} 
-                height="5" 
+                x={block.x + 1} 
+                y={block.y + block.h/2 - 2.8} 
+                width={block.w - 2} 
+                height="5.6" 
                 fill="white" 
                 fillOpacity="0.9" 
                 rx="0.5" 
@@ -263,6 +274,17 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
               > 
                 {block.name} 
               </text> 
+              <text 
+                x={block.x + block.w/2} 
+                y={block.y + block.h/2 + 4} 
+                textAnchor="middle" 
+                fill="#002F56" 
+                fillOpacity="0.6" 
+                fontSize="1.0" 
+                fontWeight="bold" 
+              > 
+                {Math.round((block.w * block.h) / 100)} m² 
+              </text> 
             </g>
 
             {block.isLocked && (
@@ -270,21 +292,6 @@ export const ZoningMap: React.FC<ZoningMapProps> = ({
                   <Lock className="text-white opacity-50" size={3} />
                </foreignObject>
             )}
-
-            <text 
-              x={block.x + block.w/2} 
-              y={block.y + block.h/2 + 4}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill="#002F56"
-              fillOpacity="0.7"
-              fontSize="1.2"
-              fontFamily="monospace"
-              fontWeight="bold"
-              className="pointer-events-none select-none"
-            >
-              {Math.round((block.w * block.h) / 100)}m²
-            </text>
           </g>
         ))}
 
