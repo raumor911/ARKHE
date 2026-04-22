@@ -1382,13 +1382,6 @@ function ProjectView({
 
                         <div className="absolute top-4 left-4 z-20 space-y-2 pointer-events-none max-w-[400px]">
                            <IntegrityShield alerts={systemicAlerts} />
-                           
-                           <div className="bg-white/80 backdrop-blur-md border border-line p-2 shadow-sm pointer-events-auto">
-                              <div className="flex items-center gap-2 text-[9px] font-black uppercase text-navy">
-                                 <Activity size={12} className="text-accent" />
-                                 Live Physics Engine v2.7
-                              </div>
-                           </div>
                         </div>
                      </div>
                   </div>
