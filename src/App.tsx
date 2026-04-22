@@ -47,6 +47,7 @@ import { Project, SpektrResult, SystemNode, SpatialBlock } from './types';
 import { ArkheLogo } from './components/branding/Logo';
 import { ZoningMap } from './components/ZoningMap';
 import { MutherGrid } from './components/MutherGrid';
+import { SociogramaDiagram } from './components/SociogramaDiagram';
 import { cn } from './lib/utils';
 import { 
   Dialog, 
@@ -624,7 +625,6 @@ function ProjectView({
   isAnalyzing: boolean;
   key?: any;
 }) {
-  const [isCanvasFullscreen, setIsCanvasFullscreen] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [adjText, setAdjText] = useState('');
   const [isReferenceOpen, setIsReferenceOpen] = useState(false);
@@ -744,16 +744,6 @@ function ProjectView({
     toast.success("CSV Jerárquico Revit-Ready generado.");
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isCanvasFullscreen) {
-        setIsCanvasFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCanvasFullscreen]);
-
   return (
     <motion.div 
         initial={{ opacity: 0, y: 10 }}
@@ -812,183 +802,23 @@ function ProjectView({
             </TabsList>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
-            <TabsContent value="overview" className="mt-0 h-full flex flex-col">
-               <div className="flex-1 flex flex-col min-h-0 space-y-8">
+          <div className="flex-1 overflow-hidden">
+            <TabsContent value="overview" className="mt-0 h-full p-6 overflow-hidden">
+               <div className="h-full flex flex-col space-y-8">
                  <div className="grid grid-cols-3 gap-6 shrink-0">
                     <MetricBox label="Causa" value={project.analysis.sociograma.causa} isLoading={isAnalyzing} />
                     <MetricBox label="Efecto" value={project.analysis.sociograma.efecto} isLoading={isAnalyzing} />
                     <MetricBox label="Objetivo" value={project.analysis.sociograma.objetivo} isLoading={isAnalyzing} />
                   </div>
                  
-                 <div className={cn(
-                   "relative border-2 border-line rounded-2xl bg-slate-50 transition-all duration-500 shadow-inner group/socio overflow-hidden",
-                   isCanvasFullscreen ? "fixed inset-0 z-[1000] rounded-none h-screen w-screen bg-bg" : "w-full h-[600px]"
-                 )}>
-                   {/* Fullscreen Toggle Controls - FIJO EN LA ESQUINA */}
-                   <div className="absolute top-4 right-4 flex items-center gap-3 z-[60]">
-                     <button 
-                       onClick={() => setIsCanvasFullscreen(!isCanvasFullscreen)}
-                       className="p-3 bg-white/90 backdrop-blur-md border border-line shadow-2xl hover:bg-navy hover:text-white transition-all group/expand active:scale-95"
-                       title={isCanvasFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                     >
-                       {isCanvasFullscreen ? (
-                         <Minimize2 size={20} className="group-hover/expand:rotate-180 transition-transform duration-500" />
-                       ) : (
-                         <Maximize2 size={20} className="group-hover/expand:scale-110 transition-transform" />
-                       )}
-                     </button>
-                   </div>
-
-                   <div className="absolute top-4 left-4 text-[8px] font-mono text-muted uppercase z-10 transition-opacity group-hover/socio:opacity-100 opacity-50">
-                     SPEKTR_TRACE_ENGINE // {isCanvasFullscreen ? 'FULL_IMMERSION_MODE' : 'Canvas Mode v2.0'}
-                   </div>
-                   
-                   <ScrollArea className="h-full w-full cursor-grab active:cursor-grabbing">
-                     <div 
-                       className="p-12 flex flex-col items-center relative w-full min-w-[1000px]"
-                       style={{ 
-                         backgroundImage: 'radial-gradient(var(--navy) 0.5px, transparent 0.5px)',
-                         backgroundSize: '32px 32px',
-                         backgroundColor: 'rgba(248, 250, 252, 0.8)'
-                       }}
-                     >
-                        {/* Logic Map Header */}
-                        <div className="mb-12 text-center">
-                          <Badge variant="outline" className="mb-4 border-navy text-navy bg-white uppercase tracking-[0.4em] text-[10px] px-4 py-1.5 font-black shrink-0">
-                            System Intelligence // SPEKTR_TRACE
-                          </Badge>
-                          <h2 className="text-2xl font-black text-navy uppercase tracking-tighter">
-                            LOGIC TRACE MAP <span className="text-navy/20">v3.0</span>
-                          </h2>
-                          <div className="mt-4 h-1 w-12 bg-accent mx-auto" />
-                        </div>
-
-                        <div className="relative flex flex-col items-center gap-4 w-full">
-                          {/* 01. Entrada Sistémica (Causa) */}
-                          <motion.div 
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            whileHover={{ y: -5, borderColor: 'var(--accent)' }}
-                            className="max-w-[380px] w-full p-8 border-2 border-line bg-surface flex flex-col gap-4 group transition-all hover:shadow-[0_20px_40px_rgba(0,112,112,0.08)] cursor-help relative"
-                          >
-                             <div className="absolute -left-1.5 top-6 w-1 h-12 bg-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-                             <div className="flex items-center justify-between border-b border-line/60 pb-4">
-                               <div className="flex flex-col">
-                                 <span className="text-[12px] font-black text-accent uppercase tracking-widest mb-1">Input // Raíz Sistémica</span>
-                                 <span className="text-[9px] font-mono text-muted uppercase">Origen: Stratos Engine</span>
-                               </div>
-                               <Activity size={20} className="text-accent/30 group-hover:text-accent transition-colors" />
-                             </div>
-                             <p className="text-sm text-navy font-bold leading-relaxed italic serif-italic opacity-95 text-center">
-                               "{project.analysis.sociograma.causa}"
-                             </p>
-                          </motion.div>
-
-                          {/* Vector de Trazabilidad Connector */}
-                          <div className="h-12 w-[2px] bg-navy/10 relative flex flex-col items-center">
-                             <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
-                                <span className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.3em] text-accent bg-bg px-2">Vector de Trazabilidad</span>
-                             </div>
-                             <ChevronDown className="absolute -bottom-3 text-navy/20" size={24} />
-                          </div>
-
-                          {/* 02. Objetivo Central */}
-                          <div className="relative group/core w-full flex justify-center">
-                             <div className="absolute -inset-4 bg-accent/10 rounded-none blur-2xl opacity-0 group-hover/core:opacity-100 transition-opacity duration-700"></div>
-                             <motion.div 
-                               initial={{ opacity: 0, scale: 0.95 }}
-                               animate={{ opacity: 1, scale: 1 }}
-                               whileHover={{ scale: 1.02 }}
-                               className="relative max-w-[320px] w-full p-8 bg-white border-4 border-navy shadow-[10px_10px_0px_0px_rgba(0,47,86,0.1)] text-center cursor-pointer mx-auto"
-                             >
-                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-[10px] px-4 py-1 text-white font-black tracking-[0.4em] uppercase shadow-xl whitespace-nowrap">
-                                  OBJETIVO_ESTRATÉGICO
-                                </span>
-                                <p className="text-base font-black leading-tight text-navy uppercase">
-                                  {project.analysis.sociograma.objetivo}
-                                </p>
-                             </motion.div>
-                          </div>
-
-                          {/* Resultado Esperado Connector */}
-                          <div className="h-12 w-[2px] bg-navy/10 relative flex flex-col items-center">
-                             <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-navy/30 animate-pulse" />
-                                <span className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.3em] text-muted bg-bg px-2">Resultado Esperado</span>
-                             </div>
-                             <ChevronDown className="absolute -bottom-3 text-navy/20" size={24} />
-                          </div>
-
-                          {/* 03. Impacto Final (Efecto) */}
-                          <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            whileHover={{ y: 5, borderColor: 'var(--navy)' }}
-                            className="max-w-[380px] w-full p-8 border-2 border-line bg-surface flex flex-col gap-4 group transition-all hover:shadow-[0_20px_40px_rgba(0,65,106,0.08)] cursor-help relative"
-                          >
-                             <div className="absolute -right-1.5 top-6 w-1 h-12 bg-navy opacity-0 group-hover:opacity-100 transition-opacity" />
-                             <div className="flex items-center justify-between border-b border-line/60 pb-4">
-                               <div className="flex flex-col">
-                                 <span className="text-[12px] font-black text-navy/40 uppercase tracking-widest mb-1 group-hover:text-navy transition-colors">Output // Impacto Final</span>
-                                 <span className="text-[9px] font-mono text-muted uppercase">Destino: Axon Logic</span>
-                               </div>
-                               <CheckCircle2 size={20} className="text-navy/10 group-hover:text-navy transition-colors" />
-                             </div>
-                             <p className="text-sm text-navy font-bold leading-relaxed italic serif-italic opacity-95 text-center">
-                               "{project.analysis.sociograma.efecto}"
-                             </p>
-                          </motion.div>
-
-                          {/* Tertiary Co-Stakeholder Tier: Discovery Hub */}
-                          <div className="w-full space-y-12 mt-12">
-                             <div className="flex items-center gap-8">
-                                <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-line to-transparent" />
-                                <span className="text-[10px] font-black text-muted/50 uppercase tracking-[0.4em] shrink-0">Peripheral System Stakeholders</span>
-                                <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-line to-transparent" />
-                             </div>
-                             
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                {[
-                                  { l: 'GOBIERNO', s: 'REGULACIÓN JURÍDICA', d: 'Normativa ISO/Local Architectural' },
-                                  { l: 'USUARIO', s: 'EXPERIENCIA HUMANA', d: 'Factor Antropométrico & Percepción' },
-                                  { l: 'SITIO', s: 'CONDICIONES CLIMÁTICAS', d: 'Impacto Ambiental & Regenerativo' }
-                                ].map((item, i) => (
-                                  <motion.div 
-                                    key={i} 
-                                    whileHover={{ y: -8, borderColor: 'var(--accent)', backgroundColor: 'rgba(255,255,255,0.8)' }}
-                                    className="p-8 border-2 border-dashed border-line bg-surface/50 text-center transition-all cursor-crosshair shadow-sm hover:shadow-xl flex flex-col items-center gap-2"
-                                  >
-                                     <div className="text-[10px] font-black text-accent/60 mb-1 tracking-[0.3em] uppercase">{item.l}</div>
-                                     <div className="text-[14px] font-black text-navy tracking-tight">{item.s}</div>
-                                     <div className="mt-2 text-[9px] font-mono text-muted uppercase tracking-tighter opacity-70 italic leading-snug">{item.d}</div>
-                                  </motion.div>
-                                ))}
-                             </div>
-                          </div>
-                        </div>
-                     </div>
-                     <ScrollBar orientation="horizontal" className="bg-navy/5 h-4" />
-                     <ScrollBar orientation="vertical" className="bg-navy/5 w-4" />
-                   </ScrollArea>
-
-                   {/* UI OVERLAY: Navigation Indicator */}
-                   <div className="absolute bottom-6 right-6 pointer-events-none flex flex-col items-end gap-3 z-20">
-                     <div className="bg-white/90 backdrop-blur-xl border-2 border-navy/10 p-4 rounded-xl shadow-2xl flex items-center gap-4">
-                        <div className="flex flex-col items-end">
-                           <span className="text-[10px] font-black text-navy uppercase tracking-widest">MODE: CANVAS_LOCKED</span>
-                           <span className="text-[8px] font-mono text-accent">ENGINE_DPI: 1:1 // SCALE: FIXED</span>
-                        </div>
-                        <div className="w-2.5 h-2.5 bg-accent rounded-full animate-pulse shadow-[0_0_10px_rgba(0,112,112,0.5)]" />
-                     </div>
-                   </div>
+                 <div className="flex-1 min-h-0">
+                    <SociogramaDiagram data={project.analysis.sociograma} />
                  </div>
                </div>
             </TabsContent>
 
-            <TabsContent value="sintesis" className="mt-0 h-full flex flex-col overflow-hidden">
-               <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none bg-transparent">
+            <TabsContent value="sintesis" className="mt-0 h-full p-6 overflow-hidden">
+               <Card className="h-full flex flex-col overflow-hidden border-none shadow-none bg-transparent">
                  <CardHeader className="px-0 pb-4 flex flex-row items-center justify-between">
                    <CardTitle className="text-navy flex items-center gap-2 text-sm uppercase tracking-widest font-black">
                      <Database className="h-4 w-4 text-accent" />
@@ -1004,8 +834,8 @@ function ProjectView({
                      EXPORTAR CSV (REVIT)
                    </Button>
                  </CardHeader>
-                 <CardContent className="p-0 flex-1 flex flex-col min-h-0 overflow-auto">
-                    <ScrollArea className="h-[65vh] w-full rounded-md border border-line bg-surface">
+                 <CardContent className="p-0 flex-1 flex flex-col min-h-0">
+                    <ScrollArea className="flex-1 w-full rounded-md border border-line bg-surface">
                       <div className="min-w-[800px] p-4">
                         <div className="flex bg-bg border-b border-line py-2 px-4 font-black text-[10px] uppercase tracking-widest text-muted">
                           <div className="w-[120px]">Código</div>
@@ -1022,190 +852,194 @@ function ProjectView({
                </Card>
             </TabsContent>
 
-            <TabsContent value="matriz" className="mt-0 h-full flex flex-col overflow-hidden">
-               <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-                  <div className="flex items-center justify-between">
-                     <div className="flex flex-col text-navy">
-                       <span className="text-[12px] font-black uppercase tracking-widest">D1.2 Matriz de Interacción de Muther</span>
-                       <span className="text-[10px] font-mono text-muted uppercase">Análisis de Adyacencias Técnico-Funcionales</span>
-                     </div>
-                     <div className="flex items-center gap-4 bg-bg p-2 border border-line">
-                        {['A', 'E', 'I', 'O', 'U', 'X'].map(c => (
-                          <div key={c} className="flex items-center gap-1.5 px-1">
-                             <div className={cn("w-3 h-3 flex items-center justify-center text-[7px] font-black border border-navy/10", 
-                               c === 'A' ? 'bg-emerald-500 text-white' : 
-                               c === 'X' ? 'bg-destructive text-white' : 'bg-slate-50 text-slate-400'
-                             )}>{c}</div>
-                          </div>
-                        ))}
-                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase mt-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-emerald-500 shrink-0" />
-                      <span>A: Absolutamente Necesario</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                      <span>E: Especialmente Importante</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                      <span>I: Importante</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                      <span>O: Ordinario</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
-                      <span>U: Sin Importancia</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-destructive shrink-0" />
-                      <span>X: Indeseable</span>
-                    </div>
-                  </div>
-                  <ScrollArea className="flex-1 border border-line bg-surface shadow-inner">
-                     <MutherGrid nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
-                  </ScrollArea>
-                  <div className="mt-8 space-y-4">
+            <TabsContent value="matriz" className="mt-0 h-full p-6 overflow-hidden">
+               <ScrollArea className="h-full">
+                 <div className="flex flex-col gap-4 pb-8">
                     <div className="flex items-center justify-between">
-                      <div className="flex flex-col text-navy">
-                        <span className="text-[12px] font-black uppercase tracking-widest">3) Grafo de Interacción (Visualización Sistémica)</span>
-                        <span className="text-[10px] font-mono text-muted uppercase">Motor Mermaid: Trazabilidad Inamovible</span>
+                       <div className="flex flex-col text-navy">
+                         <span className="text-[12px] font-black uppercase tracking-widest">D1.2 Matriz de Interacción de Muther</span>
+                         <span className="text-[10px] font-mono text-muted uppercase">Análisis de Adyacencias Técnico-Funcionales</span>
+                       </div>
+                       <div className="flex items-center gap-4 bg-bg p-2 border border-line">
+                          {['A', 'E', 'I', 'O', 'U', 'X'].map(c => (
+                            <div key={c} className="flex items-center gap-1.5 px-1">
+                               <div className={cn("w-3 h-3 flex items-center justify-center text-[7px] font-black border border-navy/10", 
+                                 c === 'A' ? 'bg-emerald-500 text-white' : 
+                                 c === 'X' ? 'bg-destructive text-white' : 'bg-slate-50 text-slate-400'
+                               )}>{c}</div>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase mt-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-emerald-500 shrink-0" />
+                        <span>A: Absolutamente Necesario</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="xs" 
-                          className="h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black"
-                          onClick={() => {
-                            navigator.clipboard.writeText(mermaidCode);
-                            toast.success("Código Mermaid copiado al portapapeles.");
-                          }}
-                        >
-                          Copiar Código
-                        </Button>
-                        <Button 
-                          variant={showReasons ? "default" : "outline"} 
-                          size="xs" 
-                          className={cn(
-                            "h-7 text-[9px] rounded-none gap-2 uppercase tracking-widest font-black",
-                            showReasons ? "bg-navy text-white" : "border-line text-navy"
-                          )}
-                          onClick={() => setShowReasons(!showReasons)}
-                        >
-                          {showReasons ? "Ocultar Razones" : "Mostrar Razones"}
-                        </Button>
+                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                        <span>E: Especialmente Importante</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                        <span>I: Importante</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                        <span>O: Ordinario</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-slate-50 border border-line shrink-0" />
+                        <span>U: Sin Importancia</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-destructive shrink-0" />
+                        <span>X: Indeseable</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase">
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-0.5 border-t-4 border-navy shrink-0" />
-                        <span>Líneas gruesas: Clase "A"</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-0.5 border-t-2 border-navy shrink-0" />
-                        <span>Líneas sólidas: Clase "E"</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-0.5 border-t-2 border-navy border-dashed shrink-0" />
-                        <span>Líneas punteadas: Clase "X"</span>
-                      </div>
+                    <div className="border border-line bg-surface shadow-inner h-[400px]">
+                       <MutherGrid nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
                     </div>
-                    <MermaidDiagram code={mermaidCode} />
-                  </div>
-                  <div className="bg-amber/5 border-l-4 border-amber p-4 mt-2">
-                     <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wider leading-relaxed">
-                        ANÁLISIS DE MASA: Las relaciones de clase "A" y "E" activan vectores de atracción en el motor MORPHO. 
-                        Las relaciones "X" disparan fuerzas de repulsión reactiva.
-                     </p>
-                  </div>
-               </div>
+                    <div className="mt-8 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col text-navy">
+                          <span className="text-[12px] font-black uppercase tracking-widest">3) Grafo de Interacción (Visualización Sistémica)</span>
+                          <span className="text-[10px] font-mono text-muted uppercase">Motor Mermaid: Trazabilidad Inamovible</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="xs" 
+                            className="h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black"
+                            onClick={() => {
+                              navigator.clipboard.writeText(mermaidCode);
+                              toast.success("Código Mermaid copiado al portapapeles.");
+                            }}
+                          >
+                            Copiar Código
+                          </Button>
+                          <Button 
+                            variant={showReasons ? "default" : "outline"} 
+                            size="xs" 
+                            className={cn(
+                              "h-7 text-[9px] rounded-none gap-2 uppercase tracking-widest font-black",
+                              showReasons ? "bg-navy text-white" : "border-line text-navy"
+                            )}
+                            onClick={() => setShowReasons(!showReasons)}
+                          >
+                            {showReasons ? "Ocultar Razones" : "Mostrar Razones"}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-0.5 border-t-4 border-navy shrink-0" />
+                          <span>Líneas gruesas: Clase "A"</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-0.5 border-t-2 border-navy shrink-0" />
+                          <span>Líneas sólidas: Clase "E"</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-0.5 border-t-2 border-navy border-dashed shrink-0" />
+                          <span>Líneas punteadas: Clase "X"</span>
+                        </div>
+                      </div>
+                      <MermaidDiagram code={mermaidCode} />
+                    </div>
+                    <div className="bg-amber/5 border-l-4 border-amber p-4 mt-2">
+                       <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wider leading-relaxed">
+                          ANÁLISIS DE MASA: Las relaciones de clase "A" y "E" activan vectores de atracción en el motor MORPHO. 
+                          Las relaciones "X" disparan fuerzas de repulsión reactiva.
+                       </p>
+                    </div>
+                 </div>
+               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="medios" className="mt-0 h-full">
-               <div className="grid grid-cols-2 gap-6">
-                 {/* Investment Consultant Card - Proactive UX */}
-                 {isEstimationMode && project.analysis?.budget_validation.estimated_investment && (
-                   <motion.div 
-                     initial={{ opacity: 0, y: 10 }}
-                     animate={{ opacity: 1, y: 0 }}
-                     className="col-span-2 tech-panel bg-navy text-white p-6 mb-2 border-accent/40 relative overflow-hidden"
-                   >
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl -mr-16 -mt-16" />
-                     <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="space-y-2">
-                           <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[9px] border-accent text-accent uppercase font-black tracking-widest px-2">Axon-Fin Consulting</Badge>
-                              <span className="text-[10px] font-mono text-white/60">ESTIMACIÓN PARAMÉTRICA v3.6</span>
-                           </div>
-                           <h3 className="text-2xl font-black uppercase tracking-tight">Inversión Sugerida: <span className="text-accent">${project.analysis.budget_validation.estimated_investment?.min?.toLocaleString() || 'N/A'} - ${project.analysis.budget_validation.estimated_investment?.max?.toLocaleString() || 'N/A'} MXN</span></h3>
-                           <p className="text-[11px] text-white/70 max-w-2xl italic leading-loose">
-                              Cálculo basado en <b>{project.analysis.budget_validation.total_m2}m²</b> proyectados y requerimientos técnicos detectados. Grado de confianza: <b>{project.analysis.budget_validation.estimated_investment.confidence}</b>.
-                           </p>
+            <TabsContent value="medios" className="mt-0 h-full p-6 overflow-hidden">
+               <ScrollArea className="h-full">
+                 <div className="grid grid-cols-2 gap-6 pb-8">
+                   {/* Investment Consultant Card */}
+                   {isEstimationMode && project.analysis?.budget_validation.estimated_investment && (
+                     <motion.div 
+                       initial={{ opacity: 0, y: 10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       className="col-span-2 tech-panel bg-navy text-white p-6 border-accent/40 relative overflow-hidden"
+                     >
+                       <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                       <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                          <div className="space-y-2">
+                             <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[9px] border-accent text-accent uppercase font-black tracking-widest px-2">Axon-Fin Consulting</Badge>
+                                <span className="text-[10px] font-mono text-white/60">ESTIMACIÓN PARAMÉTRICA v3.6</span>
+                             </div>
+                             <h3 className="text-2xl font-black uppercase tracking-tight">Inversión Sugerida: <span className="text-accent">${project.analysis.budget_validation.estimated_investment?.min?.toLocaleString() || 'N/A'} - ${project.analysis.budget_validation.estimated_investment?.max?.toLocaleString() || 'N/A'} MXN</span></h3>
+                             <p className="text-[11px] text-white/70 max-w-2xl italic leading-loose">
+                                Cálculo basado en <b>{project.analysis.budget_validation.total_m2}m²</b> proyectados y requerimientos técnicos detectados. Grado de confianza: <b>{project.analysis.budget_validation.estimated_investment.confidence}</b>.
+                             </p>
+                          </div>
+                          <div className="flex flex-col items-center gap-3 bg-white/5 p-4 border border-white/10 backdrop-blur-md">
+                             <div className="text-center">
+                                <div className="text-[9px] font-black uppercase text-accent mb-1 tracking-widest">Promedio Sugerido</div>
+                                <div className="text-xl font-mono">${project.analysis.budget_validation.estimated_investment?.avg_per_m2?.toLocaleString() || 'N/A'} <span className="text-[10px] opacity-40">/m²</span></div>
+                             </div>
+                             <div className="flex gap-2">
+                               {['Interés Social', 'Medio', 'Lujo'].map(level => (
+                                 <button
+                                   key={level}
+                                   onClick={() => onReAnalyze(project.id, `AJUSTAR ESTIMACIÓN: Cambiar nivel de acabados a "${level}". Recalcular inversión paramétrica.`)}
+                                   className="text-[8px] font-black uppercase px-2 py-1 border border-white/20 hover:border-accent hover:bg-accent/20 transition-all"
+                                 >
+                                   {level}
+                                 </button>
+                               ))}
+                             </div>
+                             <Button 
+                               onClick={handleFixBudget}
+                               disabled={isAnalyzing}
+                               className="bg-accent hover:bg-[#007070] text-white rounded-none h-10 w-full font-black text-[9px] uppercase tracking-[0.2em] shadow-xl"
+                             >
+                               {isAnalyzing ? "PROCESANDO..." : "FIJAR COMO PRESUPUESTO BASE"}
+                             </Button>
+                          </div>
+                       </div>
+                     </motion.div>
+                   )}
+
+                   {Object.entries(project.analysis.medios).map(([key, detail], index) => (
+                     <div key={key} className="tech-panel h-full group hover:border-accent transition-all relative">
+                        <div className="tech-header bg-navy text-white border-none py-1 h-10 px-4">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">M{index + 1}. {key}</span>
+                            <span className="text-[8px] font-mono text-accent uppercase">{detail.importance}</span>
+                          </div>
+                          <Activity size={14} className="text-accent opacity-50" />
                         </div>
-                        <div className="flex flex-col items-center gap-3 bg-white/5 p-4 border border-white/10 backdrop-blur-md">
-                           <div className="text-center">
-                              <div className="text-[9px] font-black uppercase text-accent mb-1 tracking-widest">Promedio Sugerido</div>
-                              <div className="text-xl font-mono">${project.analysis.budget_validation.estimated_investment?.avg_per_m2?.toLocaleString() || 'N/A'} <span className="text-[10px] opacity-40">/m²</span></div>
-                           </div>
-                           <div className="flex gap-2">
-                             {['Interés Social', 'Medio', 'Lujo'].map(level => (
-                               <button
-                                 key={level}
-                                 onClick={() => onReAnalyze(project.id, `AJUSTAR ESTIMACIÓN: Cambiar nivel de acabados a "${level}". Recalcular inversión paramétrica.`)}
-                                 className="text-[8px] font-black uppercase px-2 py-1 border border-white/20 hover:border-accent hover:bg-accent/20 transition-all"
-                               >
-                                 {level}
-                               </button>
-                             ))}
-                           </div>
-                           <Button 
-                             onClick={handleFixBudget}
-                             disabled={isAnalyzing}
-                             className="bg-accent hover:bg-[#007070] text-white rounded-none h-10 w-full font-black text-[9px] uppercase tracking-[0.2em] shadow-xl"
-                           >
-                             {isAnalyzing ? "PROCESANDO..." : "FIJAR COMO PRESUPUESTO BASE"}
-                           </Button>
+                        <div className="p-5 space-y-4">
+                          <div className="relative">
+                            <div className="absolute -left-3 top-0 w-[1px] h-full bg-accent/20" />
+                            <p className="text-xs text-navy leading-loose serif-italic opacity-90">{detail.description}</p>
+                          </div>
+                          
+                          <div className="pt-4 border-t border-line/50">
+                            <div className="flex items-center gap-2 mb-2">
+                               <div className="w-1 h-1 bg-accent" />
+                               <span className="text-[9px] font-black text-muted uppercase tracking-tighter">Requerimiento General (RG)</span>
+                            </div>
+                            <div className="bg-bg text-navy px-3 py-2 border-l-2 border-accent font-mono text-[10px] leading-snug">
+                               {detail.rg}
+                            </div>
+                          </div>
                         </div>
                      </div>
-                   </motion.div>
-                 )}
-
-                 {Object.entries(project.analysis.medios).map(([key, detail], index) => (
-                   <div key={key} className="tech-panel h-full group hover:border-accent transition-all relative">
-                      <div className="tech-header bg-navy text-white border-none py-1 h-10 px-4">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-white uppercase tracking-widest">M{index + 1}. {key}</span>
-                          <span className="text-[8px] font-mono text-accent uppercase">{detail.importance}</span>
-                        </div>
-                        <Activity size={14} className="text-accent opacity-50" />
-                      </div>
-                      <div className="p-5 space-y-4">
-                        <div className="relative">
-                          <div className="absolute -left-3 top-0 w-[1px] h-full bg-accent/20" />
-                          <p className="text-xs text-navy leading-loose serif-italic opacity-90">{detail.description}</p>
-                        </div>
-                        
-                        <div className="pt-4 border-t border-line/50">
-                          <div className="flex items-center gap-2 mb-2">
-                             <div className="w-1 h-1 bg-accent" />
-                             <span className="text-[9px] font-black text-muted uppercase tracking-tighter">Requerimiento General (RG)</span>
-                          </div>
-                          <div className="bg-bg text-navy px-3 py-2 border-l-2 border-accent font-mono text-[10px] leading-snug">
-                             {detail.rg}
-                          </div>
-                        </div>
-                      </div>
-                   </div>
-                 ))}
-               </div>
+                   ))}
+                 </div>
+               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="arquitectura" className="mt-0 h-full">
-               <div className="flex gap-6 h-full min-h-[600px]">
+            <TabsContent value="arquitectura" className="mt-0 h-full p-6 overflow-hidden">
+               <div className="flex gap-6 h-full min-h-[500px]">
                   <div className="flex-[3] flex flex-col gap-4">
                      <div className="flex items-center justify-between">
                         <div className="flex flex-col">
@@ -1234,7 +1068,7 @@ function ProjectView({
                         </Button>
                      </div>
                      
-                     <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura h-[60vh] relative">
+                     <div className="flex-1 bg-surface border border-line overflow-hidden architecture-canvas arquitectura relative">
                         <ZoningMap 
                            layout={processedLayout}
                            interactions={project.analysis.interaction_matrix}
@@ -1310,7 +1144,7 @@ function ProjectView({
                   </div>
                </div>
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
 
         {/* SIDEBAR: REFERENCIA TÉCNICA (Drawer Mode) */}
@@ -1377,8 +1211,6 @@ function ProjectView({
           )}
         </AnimatePresence>
       </div>
-
-
     </motion.div>
   );
 }
