@@ -60,7 +60,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ForceGraph } from '@graphnizer/force-graph'; // Importar la librería de grafo
+import { MermaidDiagram } from './components/MermaidDiagram';
+import { EmptyState } from './components/EmptyState';
+import { generateMermaidCode } from './lib/utils';
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -139,7 +141,7 @@ export default function App() {
         if (Array.isArray(importedProjects) && importedProjects.length > 0) {
           const isValid = importedProjects.every(p => p.id && p.name && p.analysis);
           if (isValid) {
-            await storageService.importBackup(importedProjects);
+            await storageService.importBackup(content);
             const freshProjects = await storageService.getAllProjects();
             setProjects(freshProjects);
             toast.success("Memoria local restaurada con éxito.");
@@ -627,6 +629,13 @@ function ProjectView({
   const [adjText, setAdjText] = useState('');
   const [isReferenceOpen, setIsReferenceOpen] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | undefined>();
+  const [showReasons, setShowReasons] = useState(true);
+
+  // Mermaid Logic Synthesis
+  const mermaidCode = useMemo(() => {
+    if (!project.analysis) return '';
+    return generateMermaidCode(project.analysis.system_tree, project.analysis.interaction_matrix, showReasons);
+  }, [project.analysis, showReasons]);
 
   // SÍNTESIS INTEGRAL: Fallback para spatial_layout si la IA falla
   const processedLayout = useMemo(() => {
@@ -653,8 +662,8 @@ function ProjectView({
         name: node.name,
         zone: (node.name.toLowerCase().includes('baño') || node.name.toLowerCase().includes('dormitorio')) ? 'Privado' : 
               (node.name.toLowerCase().includes('cocina') || node.name.toLowerCase().includes('lavado')) ? 'Servicio' : 'Social',
-        w: size,
-        h: size,
+        w: Math.sqrt(area) * 1.5,
+        h: Math.sqrt(area) * 1.5,
         x: 40 + (Math.random() * 20),
         y: 40 + (Math.random() * 20)
       } as SpatialBlock;
@@ -668,8 +677,8 @@ function ProjectView({
     let found: SystemNode | null = null;
     const search = (nodes: SystemNode[]) => {
       for (const n of nodes) {
-        // Universal Link: Prioridad ID, Fallback Name
-        if (n.id === selectedBlock.id || n.name === selectedBlock.name) { 
+        // Universal Link: Estricto por ID para evitar colisiones de nombres
+        if (n.id === selectedBlock.id) { 
           found = n; break; 
         }
         if (n.children) search(n.children);
@@ -814,7 +823,7 @@ function ProjectView({
                  
                  <div className={cn(
                    "relative border-2 border-line rounded-2xl bg-slate-50 transition-all duration-500 shadow-inner group/socio",
-                   isCanvasFullscreen ? "fixed inset-0 z-[1000] rounded-none h-screen w-screen bg-bg" : "w-full h-[70vh] min-h-[500px] overflow-hidden"
+                   isCanvasFullscreen ? "fixed inset-0 z-[1000] rounded-none h-screen w-screen bg-bg" : "w-full min-h-[70vh] overflow-hidden"
                  )}>
                    {/* Fullscreen Toggle Controls */}
                    <div className="absolute top-4 right-4 flex items-center gap-3 z-30">
@@ -837,119 +846,110 @@ function ProjectView({
                    
                    <ScrollArea className="h-full w-full touch-pan-x touch-pan-y overscroll-none">
                      <div 
-                       className="p-10 md:p-32 flex flex-col items-center relative"
+                       className="p-8 md:p-12 flex flex-col items-center relative w-full"
                        style={{ 
-                         minWidth: '1440px', 
-                         minHeight: '1200px',
                          backgroundImage: 'radial-gradient(var(--navy) 0.5px, transparent 0.5px)',
                          backgroundSize: '32px 32px',
                          backgroundColor: 'rgba(248, 250, 252, 0.8)'
                        }}
                      >
                         {/* Logic Map Header */}
-                        <div className="mb-24 text-center">
+                        <div className="mb-12 text-center">
                           <Badge variant="outline" className="mb-4 border-navy text-navy bg-white uppercase tracking-[0.4em] text-[10px] px-4 py-1.5 font-black shrink-0">
                             System Intelligence // SPEKTR_TRACE
                           </Badge>
-                          <h2 className="text-4xl font-black text-navy uppercase tracking-tighter">
+                          <h2 className="text-2xl font-black text-navy uppercase tracking-tighter">
                             LOGIC TRACE MAP <span className="text-navy/20">v3.0</span>
                           </h2>
-                          <div className="mt-4 h-1.5 w-16 bg-accent mx-auto" />
+                          <div className="mt-4 h-1 w-12 bg-accent mx-auto" />
                         </div>
 
-                        <div className="relative flex flex-col items-center gap-32">
-                          {/* Core Strategic Node: Forced Width 1:1 Scale */}
-                          <div className="relative group/core">
+                        <div className="relative flex flex-col items-center gap-4 w-full max-w-5xl">
+                          {/* 01. Entrada Sistémica (Causa) */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            whileHover={{ y: -5, borderColor: 'var(--accent)' }}
+                            className="max-w-[380px] w-full p-8 border-2 border-line bg-surface flex flex-col gap-4 group transition-all hover:shadow-[0_20px_40px_rgba(0,112,112,0.08)] cursor-help relative"
+                          >
+                             <div className="absolute -left-1.5 top-6 w-1 h-12 bg-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                             <div className="flex items-center justify-between border-b border-line/60 pb-4">
+                               <div className="flex flex-col">
+                                 <span className="text-[12px] font-black text-accent uppercase tracking-widest mb-1">Input // Raíz Sistémica</span>
+                                 <span className="text-[9px] font-mono text-muted uppercase">Origen: Stratos Engine</span>
+                               </div>
+                               <Activity size={20} className="text-accent/30 group-hover:text-accent transition-colors" />
+                             </div>
+                             <p className="text-sm text-navy font-bold leading-relaxed italic serif-italic opacity-95 text-center">
+                               "{project.analysis.sociograma.causa}"
+                             </p>
+                          </motion.div>
+
+                          {/* Vector de Trazabilidad Connector */}
+                          <div className="h-12 w-[2px] bg-navy/10 relative flex flex-col items-center">
+                             <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
+                                <span className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.3em] text-accent bg-bg px-2">Vector de Trazabilidad</span>
+                             </div>
+                             <ChevronDown className="absolute -bottom-3 text-navy/20" size={24} />
+                          </div>
+
+                          {/* 02. Objetivo Central */}
+                          <div className="relative group/core w-full flex justify-center">
                              <div className="absolute -inset-4 bg-accent/10 rounded-none blur-2xl opacity-0 group-hover/core:opacity-100 transition-opacity duration-700"></div>
                              <motion.div 
                                initial={{ opacity: 0, scale: 0.95 }}
                                animate={{ opacity: 1, scale: 1 }}
-                               whileHover={{ scale: 1.02, rotateY: 1 }}
-                               className="relative w-[450px] p-12 bg-white border-4 border-navy shadow-[20px_20px_0px_0px_rgba(0,47,86,0.1)] text-center cursor-pointer perspective-1000"
+                               whileHover={{ scale: 1.02 }}
+                               className="relative max-w-[320px] w-full p-8 bg-white border-4 border-navy shadow-[10px_10px_0px_0px_rgba(0,47,86,0.1)] text-center cursor-pointer mx-auto"
                              >
-                                <span className="absolute -top-4 left-8 bg-navy text-[11px] px-4 py-1.5 text-white font-black tracking-[0.3em] uppercase shadow-xl">
-                                  CORE_OBJECTIVE
+                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-navy text-[10px] px-4 py-1 text-white font-black tracking-[0.4em] uppercase shadow-xl whitespace-nowrap">
+                                  OBJETIVO_ESTRATÉGICO
                                 </span>
-                                <p className="text-lg font-black leading-tight text-navy uppercase">
+                                <p className="text-base font-black leading-tight text-navy uppercase">
                                   {project.analysis.sociograma.objetivo}
                                 </p>
-                                <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-accent/20 border-r-4 border-b-4 border-navy/10" />
                              </motion.div>
                           </div>
-                          
-                          {/* Structural Connector (Engineered visualization) */}
-                          <div className="h-32 w-[3px] bg-navy/10 relative flex flex-col items-center">
-                             <div className="absolute top-0 w-12 h-[1px] bg-navy/10" />
-                             <div className="absolute top-1/2 -translate-y-1/2 flex gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-accent animate-ping" />
-                             </div>
-                             <ChevronDown className="absolute -bottom-4 text-navy/20" size={40} />
-                          </div>
-                          
-                          {/* Primary Stakeholders Interaction Tier: Forced Layout */}
-                          <div className="grid grid-cols-2 gap-40 w-full max-w-7xl pb-24 items-start">
-                             <motion.div 
-                               initial={{ opacity: 0, x: -60 }}
-                               animate={{ opacity: 1, x: 0 }}
-                               whileHover={{ y: -15, borderColor: 'var(--accent)' }}
-                               className="w-[520px] p-12 border-2 border-line bg-surface flex flex-col gap-8 group transition-all hover:shadow-[0_50px_100px_rgba(0,112,112,0.12)] cursor-help justify-self-end relative"
-                             >
-                                <div className="absolute -left-1.5 top-6 w-1.5 h-16 bg-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="flex items-center justify-between border-b border-line/60 pb-6">
-                                  <div className="flex flex-col">
-                                    <span className="text-[14px] font-black text-accent uppercase tracking-widest mb-1">Input // Raíz Sistémica</span>
-                                    <span className="text-[10px] font-mono text-muted uppercase">Logic Origin Agent</span>
-                                  </div>
-                                  <Activity size={24} className="text-accent/30 group-hover:text-accent transition-colors" />
-                                </div>
-                                <p className="text-lg text-navy font-bold leading-relaxed italic serif-italic opacity-95">
-                                  "{project.analysis.sociograma.causa}"
-                                </p>
-                                <div className="mt-10 pt-6 border-t border-line/40 flex justify-between items-center text-[12px] font-mono text-muted uppercase tracking-[0.3em]">
-                                  <span className="flex items-center gap-3">
-                                    <div className="w-3 h-3 bg-accent/30 rounded-full" />
-                                    STRATOS // ENGINE
-                                  </span>
-                                  <span className="text-accent font-black">Verified</span>
-                                </div>
-                             </motion.div>
 
-                             <motion.div 
-                               initial={{ opacity: 0, x: 60 }}
-                               animate={{ opacity: 1, x: 0 }}
-                               whileHover={{ y: -15, borderColor: 'var(--navy)' }}
-                               className="w-[520px] p-12 border-2 border-line bg-surface flex flex-col gap-8 group transition-all hover:shadow-[0_50px_100px_rgba(0,65,106,0.12)] cursor-help relative"
-                             >
-                                <div className="absolute -right-1.5 top-6 w-1.5 h-16 bg-navy opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <div className="flex items-center justify-between border-b border-line/60 pb-6">
-                                  <div className="flex flex-col">
-                                    <span className="text-[14px] font-black text-navy/40 uppercase tracking-widest mb-1 group-hover:text-navy transition-colors">Output // Impacto Final</span>
-                                    <span className="text-[10px] font-mono text-muted uppercase">Logic Destination Axon</span>
-                                  </div>
-                                  <CheckCircle2 size={24} className="text-navy/10 group-hover:text-navy transition-colors" />
-                                </div>
-                                <p className="text-lg text-navy font-bold leading-relaxed italic serif-italic opacity-95">
-                                  "{project.analysis.sociograma.efecto}"
-                                </p>
-                                <div className="mt-10 pt-6 border-t border-line/40 flex justify-between items-center text-[12px] font-mono text-muted uppercase tracking-[0.3em]">
-                                  <span className="flex items-center gap-3">
-                                    <div className="w-3 h-3 bg-navy/10 rounded-full" />
-                                    AXON // LOGIC
-                                  </span>
-                                  <span className="text-navy/40 font-black">Calculated</span>
-                                </div>
-                             </motion.div>
+                          {/* Resultado Esperado Connector */}
+                          <div className="h-12 w-[2px] bg-navy/10 relative flex flex-col items-center">
+                             <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-navy/30 animate-pulse" />
+                                <span className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.3em] text-muted bg-bg px-2">Resultado Esperado</span>
+                             </div>
+                             <ChevronDown className="absolute -bottom-3 text-navy/20" size={24} />
                           </div>
+
+                          {/* 03. Impacto Final (Efecto) */}
+                          <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            whileHover={{ y: 5, borderColor: 'var(--navy)' }}
+                            className="max-w-[380px] w-full p-8 border-2 border-line bg-surface flex flex-col gap-4 group transition-all hover:shadow-[0_20px_40px_rgba(0,65,106,0.08)] cursor-help relative"
+                          >
+                             <div className="absolute -right-1.5 top-6 w-1 h-12 bg-navy opacity-0 group-hover:opacity-100 transition-opacity" />
+                             <div className="flex items-center justify-between border-b border-line/60 pb-4">
+                               <div className="flex flex-col">
+                                 <span className="text-[12px] font-black text-navy/40 uppercase tracking-widest mb-1 group-hover:text-navy transition-colors">Output // Impacto Final</span>
+                                 <span className="text-[9px] font-mono text-muted uppercase">Destino: Axon Logic</span>
+                               </div>
+                               <CheckCircle2 size={20} className="text-navy/10 group-hover:text-navy transition-colors" />
+                             </div>
+                             <p className="text-sm text-navy font-bold leading-relaxed italic serif-italic opacity-95 text-center">
+                               "{project.analysis.sociograma.efecto}"
+                             </p>
+                          </motion.div>
 
                           {/* Tertiary Co-Stakeholder Tier: Discovery Hub */}
-                          <div className="w-full max-w-7xl space-y-16">
-                             <div className="flex items-center gap-12">
-                                <div className="flex-1 h-[3px] bg-gradient-to-r from-transparent via-line to-transparent" />
-                                <span className="text-[12px] font-black text-muted/50 uppercase tracking-[0.6em] shrink-0">Peripheral System Stakeholders</span>
-                                <div className="flex-1 h-[3px] bg-gradient-to-r from-transparent via-line to-transparent" />
+                          <div className="w-full space-y-12 mt-12">
+                             <div className="flex items-center gap-8">
+                                <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-line to-transparent" />
+                                <span className="text-[10px] font-black text-muted/50 uppercase tracking-[0.4em] shrink-0">Peripheral System Stakeholders</span>
+                                <div className="flex-1 h-[2px] bg-gradient-to-r from-transparent via-line to-transparent" />
                              </div>
                              
-                             <div className="grid grid-cols-3 gap-12">
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 {[
                                   { l: 'GOBIERNO', s: 'REGULACIÓN JURÍDICA', d: 'Normativa ISO/Local Architectural' },
                                   { l: 'USUARIO', s: 'EXPERIENCIA HUMANA', d: 'Factor Antropométrico & Percepción' },
@@ -957,12 +957,12 @@ function ProjectView({
                                 ].map((item, i) => (
                                   <motion.div 
                                     key={i} 
-                                    whileHover={{ y: -12, borderColor: 'var(--accent)', backgroundColor: 'rgba(255,255,255,0.8)' }}
-                                    className="p-10 border-2 border-dashed border-line bg-surface/50 text-center transition-all cursor-crosshair shadow-sm hover:shadow-2xl flex flex-col items-center gap-3"
+                                    whileHover={{ y: -8, borderColor: 'var(--accent)', backgroundColor: 'rgba(255,255,255,0.8)' }}
+                                    className="p-8 border-2 border-dashed border-line bg-surface/50 text-center transition-all cursor-crosshair shadow-sm hover:shadow-xl flex flex-col items-center gap-2"
                                   >
-                                     <div className="text-[11px] font-black text-accent/60 mb-2 tracking-[0.4em] uppercase">{item.l}</div>
-                                     <div className="text-[15px] font-black text-navy tracking-tight">{item.s}</div>
-                                     <div className="mt-3 text-[10px] font-mono text-muted uppercase tracking-tighter opacity-70 italic leading-snug">{item.d}</div>
+                                     <div className="text-[10px] font-black text-accent/60 mb-1 tracking-[0.3em] uppercase">{item.l}</div>
+                                     <div className="text-[14px] font-black text-navy tracking-tight">{item.s}</div>
+                                     <div className="mt-2 text-[9px] font-mono text-muted uppercase tracking-tighter opacity-70 italic leading-snug">{item.d}</div>
                                   </motion.div>
                                 ))}
                              </div>
@@ -1070,21 +1070,51 @@ function ProjectView({
                      <MutherGrid nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
                   </ScrollArea>
                   <div className="mt-8 space-y-4">
-                    <div className="flex flex-col text-navy">
-                      <span className="text-[12px] font-black uppercase tracking-widest">3) Grafo de Interacción (Visualización Sistémica)</span>
-                      <span className="text-[10px] font-mono text-muted uppercase">Algoritmo MORPHO: Agrupación de Locales</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase">
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-0.5 bg-emerald-500 shrink-0" />
-                        <span>Líneas gruesas: Proximidad crítica ("A")</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col text-navy">
+                        <span className="text-[12px] font-black uppercase tracking-widest">3) Grafo de Interacción (Visualización Sistémica)</span>
+                        <span className="text-[10px] font-mono text-muted uppercase">Motor Mermaid: Trazabilidad Inamovible</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-0.5 border-t-2 border-destructive border-dashed shrink-0" />
-                        <span>Líneas punteadas rojas: Proximidad indeseable ("X")</span>
+                        <Button 
+                          variant="outline" 
+                          size="xs" 
+                          className="h-7 text-[9px] rounded-none border-line gap-2 uppercase tracking-widest font-black"
+                          onClick={() => {
+                            navigator.clipboard.writeText(mermaidCode);
+                            toast.success("Código Mermaid copiado al portapapeles.");
+                          }}
+                        >
+                          Copiar Código
+                        </Button>
+                        <Button 
+                          variant={showReasons ? "default" : "outline"} 
+                          size="xs" 
+                          className={cn(
+                            "h-7 text-[9px] rounded-none gap-2 uppercase tracking-widest font-black",
+                            showReasons ? "bg-navy text-white" : "border-line text-navy"
+                          )}
+                          onClick={() => setShowReasons(!showReasons)}
+                        >
+                          {showReasons ? "Ocultar Razones" : "Mostrar Razones"}
+                        </Button>
                       </div>
                     </div>
-                    <InteractionGraph nodes={project.analysis.system_tree} interactions={project.analysis.interaction_matrix} />
+                    <div className="grid grid-cols-3 gap-x-8 gap-y-2 text-[10px] font-mono text-muted uppercase">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-0.5 border-t-4 border-navy shrink-0" />
+                        <span>Líneas gruesas: Clase "A"</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-0.5 border-t-2 border-navy shrink-0" />
+                        <span>Líneas sólidas: Clase "E"</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-0.5 border-t-2 border-navy border-dashed shrink-0" />
+                        <span>Líneas punteadas: Clase "X"</span>
+                      </div>
+                    </div>
+                    <MermaidDiagram code={mermaidCode} />
                   </div>
                   <div className="bg-amber/5 border-l-4 border-amber p-4 mt-2">
                      <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wider leading-relaxed">
@@ -1144,11 +1174,11 @@ function ProjectView({
                    </motion.div>
                  )}
 
-                 {Object.entries(project.analysis.medios).map(([key, detail]) => (
+                 {Object.entries(project.analysis.medios).map(([key, detail], index) => (
                    <div key={key} className="tech-panel h-full group hover:border-accent transition-all relative">
                       <div className="tech-header bg-navy text-white border-none py-1 h-10 px-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-white uppercase tracking-widest">{key}</span>
+                          <span className="text-[10px] font-black text-white uppercase tracking-widest">M{index + 1}. {key}</span>
                           <span className="text-[8px] font-mono text-accent uppercase">{detail.importance}</span>
                         </div>
                         <Activity size={14} className="text-accent opacity-50" />
@@ -1441,14 +1471,20 @@ function TreeRow({ node, depth }: { node: SystemNode; depth: number; key?: any }
 }
 
 function MetricBox({ label, value, isLoading }: { label: string; value?: string; isLoading?: boolean }) {
+  const displayValue = value && value !== "" && value !== "PENDIENTE" ? value : "AUDITORÍA REQUERIDA";
+  const isAuditRequired = displayValue === "AUDITORÍA REQUERIDA";
+
   return (
     <div className="p-4 border border-line bg-surface flex flex-col gap-1 transition-all hover:border-accent group">
       <span className="text-[10px] font-bold text-navy/50 uppercase tracking-tighter mb-1">{label}</span>
       {isLoading ? (
         <div className="h-4 w-full bg-slate-200 animate-pulse rounded" />
       ) : (
-        <p className="text-[11px] font-bold text-navy uppercase leading-tight">
-          {value && value !== "" ? value : "DEFINIR POR DISEÑO"}
+        <p className={cn(
+          "text-[11px] font-bold uppercase leading-tight",
+          isAuditRequired ? "text-amber-500" : "text-navy"
+        )}>
+          {displayValue}
         </p>
       )}
     </div>
@@ -1507,76 +1543,4 @@ function TabTrigger({ value, label, sub }: { value: string; label: string; sub: 
   );
 }
 
-function EmptyState({ onStart, isAnalyzing }: { onStart: () => void; isAnalyzing?: boolean }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-line bg-surface/30">
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="flex flex-col items-center max-w-sm text-center"
-      >
-        <div className="mb-10 relative">
-           <ArkheLogo variant="icon" size={80} isAnalyzing={isAnalyzing} />
-           <div className="absolute -inset-4 bg-accent/5 rounded-full blur-2xl animate-pulse -z-10" />
-        </div>
-        <h3 className="text-xl font-serif italic text-navy mb-2">Ingesta Pendiente</h3>
-        <p className="text-xs text-muted mb-8 uppercase tracking-widest font-medium">
-          El motor lógico ARKHÉ está en reposo. Inicie un nuevo expediente para comenzar el análisis sistémico.
-        </p>
-        <Button 
-          onClick={onStart}
-          className="rounded-none bg-navy font-bold text-[10px] px-8 tracking-[.2em] uppercase h-12"
-        >
-          NUEVA INGESTA
-        </Button>
-      </motion.div>
-    </div>
-  );
-}
 
-interface GraphNode {
-  id: string;
-  name: string;
-  x?: number;
-  y?: number;
-}
-
-interface GraphLink {
-  source: string;
-  target: string;
-  value: number;
-  type: 'A' | 'X' | string;
-}
-
-function InteractionGraph({ nodes, interactions }: { nodes: SystemNode[]; interactions: any[] }) {
-  const graphData = useMemo(() => {
-    const graphNodes: GraphNode[] = nodes.map(node => ({ id: node.id, name: node.name }));
-    const graphLinks: GraphLink[] = interactions
-      .filter(interaction => interaction.from_id && interaction.to_id)
-      .map(interaction => ({
-      source: interaction.from_id,
-      target: interaction.to_id,
-      value: interaction.clase === 'A' ? 3 : interaction.clase === 'X' ? 1 : 0.5, // Grosor de la línea
-      type: interaction.clase,
-    }));
-
-    return { nodes: graphNodes, links: graphLinks };
-  }, [nodes, interactions]);
-
-  return (
-    <div className="w-full h-full border border-line bg-surface">
-      <ForceGraph
-        data={graphData}
-        nodeColor="#002F56"
-        linkColor={link => link.type === 'A' ? '#007070' : link.type === 'X' ? '#ef4444' : '#cccccc'}
-        linkWidth={link => link.value}
-        linkStyle={link => link.type === 'X' ? 'dashed' : 'straight'}
-        showArrows={true}
-        showNodeLabels={true}
-        nodeLabel="name"
-        width={null} // Ajusta el ancho según sea necesario
-        height={null} // Ajusta la altura según sea necesario
-      />
-    </div>
-  );
-}

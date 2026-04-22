@@ -103,3 +103,17 @@ export interface Project {
     data: string; // base64
   }[];
 }
+
+export interface GraphNode {
+  id: string;
+  name: string;
+  x?: number;
+  y?: number;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+  value: number;
+  type: 'A' | 'X' | string;
+}

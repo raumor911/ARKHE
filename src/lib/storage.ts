@@ -67,16 +67,46 @@ export const storageService = {
    * Exports the entire database as a downloadable JSON file.
    */
   async exportBackup(): Promise<string> {
-    const data = await this.getAllProjects();
-    return JSON.stringify(data, null, 2);
+    const projects = await this.getAllProjects();
+    // Inyectamos metadatos de versión para control ISO 
+    const backup = {
+      version: "2.7.0-STABLE",
+      timestamp: new Date().toISOString(),
+      data: projects.map(p => ({
+        ...p,
+        history: p.history || [], // Aseguramos que el historial se exporte
+        analysis: p.analysis ? { // Aseguramos que spatial_layout se exporte si existe
+          ...p.analysis,
+          spatial_layout: p.analysis.spatial_layout || []
+        } : undefined
+      }))
+    };
+    return JSON.stringify(backup, null, 2);
   },
 
   /**
    * Imports a backup, merging with existing projects or overwriting if IDs match.
    */
-  async importBackup(projects: Project[]): Promise<void> {
-    const promises = projects.map(p => localforage.setItem(p.id, p));
-    await Promise.all(promises);
+  async importBackup(content: string): Promise<void> {
+    const backup = JSON.parse(content);
+    const projectsToImport = Array.isArray(backup) ? backup : backup.data;
+    
+    for (const p of projectsToImport) {
+      // Normalización de "PENDIENTES" 
+      if (p.analysis) {
+        Object.keys(p.analysis.sociograma).forEach(k => {
+          if (p.analysis.sociograma[k] === "PENDIENTE") p.analysis.sociograma[k] = "DEFINIR POR DISEÑO";
+        });
+        // Inyectar campos faltantes para compatibilidad con versiones antiguas
+        if (p.analysis.normative_confidence_score === undefined) {
+          p.analysis.normative_confidence_score = 0.5; // Valor por defecto
+        }
+      }
+      if (p.history === undefined) {
+        p.history = []; // Inicializar historial si no existe
+      }
+      await localforage.setItem(p.id, p);
+    }
   },
 
   /**

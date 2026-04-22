@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { SpektrResult, ChatMessage } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || '' });
 
 const SYSTEM_INSTRUCTION = `
 Actúa como el Motor de Gobernanza "ARKHÉ v2.7". Tu función es implementar una Reingeniería Sistémica basada en el Método Cuantitativo de Sánchez y realizar la SÍNTESIS ESPACIAL DINÁMICA (Live MORPHO).
@@ -25,14 +25,21 @@ Devuelve UNICAMENTE un objeto JSON siguiendo este esquema estricto:
     "efecto": string, 
     "objetivo": string 
   },
-  "medios": { ... },
+  "medios": {
+    "Humano": { "description": string, "importance": "Imprescindible" | "Conveniente" | "Accesoria", "rg": string },
+    "Económico": { "description": string, "importance": "Imprescindible" | "Conveniente" | "Accesoria", "rg": string },
+    "Físico": { "description": string, "importance": "Imprescindible" | "Conveniente" | "Accesoria", "rg": string },
+    "Climático": { "description": string, "importance": "Imprescindible" | "Conveniente" | "Accesoria", "rg": string },
+    "Tecnológico": { "description": string, "importance": "Imprescindible" | "Conveniente" | "Accesoria", "rg": string },
+    "Jurídico": { "description": string, "importance": "Imprescindible" | "Conveniente" | "Accesoria", "rg": string }
+  },
   "system_tree": [ 
     { "id": string, "name": string, "type": "Local", "calculated_m2": number, "layout_hints": { "anchor": string, "priority": number } }
   ],
   "interaction_matrix": [ 
     { "from": string, "to": string, "clase": "A" | "E" | "I" | "O" | "U" | "X", "razon": string } // 'from' y 'to' son IDs de locales
   ],
-  "spatial_layout": [ // OPCIONAL si es muy complejo
+  "spatial_layout": [ // OPCIONAL si es muy complejo. Usa w=h=Math.sqrt(m2)*1.5 para escalado proporcional.
     { "id": string, "name": string, "zone": "Privado" | "Social" | "Servicio" | "Conexión", "x": number, "y": number, "w": number, "h": number }
   ],
   "budget_validation": { "alert": boolean, "deviation": number, "recommendation": string, "total_m2": number, "estimated_investment": { ... } },
